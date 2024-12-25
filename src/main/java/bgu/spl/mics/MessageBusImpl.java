@@ -1,12 +1,13 @@
 package bgu.spl.mics;
 
-import org.w3c.dom.Node;
-import sun.jvm.hotspot.opto.Node_List;
+//import org.w3c.dom.Node;
+//import sun.jvm.hotspot.opto.Node_List;
 
-import java.util.LinkedList;
-import java.util.List;
+//import java.util.LinkedList;
+//import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -17,18 +18,28 @@ import java.util.concurrent.atomic.AtomicInteger;
  * All other methods and members you add the class must be private.
  */
 public class MessageBusImpl implements MessageBus {
-	private ConcurrentHashMap<MicroService, BlockingQueue<Message>> serviceMap;
-	private ConcurrentHashMap<Class<? extends Event>, List<MicroService>> eventSubscribers;
-	private ConcurrentHashMap<Class<? extends Broadcast>, List<MicroService>> broadcastSubscribers;
+	private static MessageBusImpl instance;
+	private ConcurrentHashMap<MicroService, BlockingQueue<Event>> eventServiceMap;
+	private ConcurrentHashMap<MicroService, BlockingQueue<Broadcast>> broadcastServiceMap;
+	private ConcurrentHashMap<Class<? extends Event>, CopyOnWriteArrayList<MicroService>> eventSubscribers;
+	private ConcurrentHashMap<Class<? extends Broadcast>, CopyOnWriteArrayList <MicroService>> broadcastSubscribers;
 	private ConcurrentHashMap<Class<? extends Event>, AtomicInteger> eventIndex; //AtomicInteger is thread safe
 	private ConcurrentHashMap<Event, Future> futureEvents;
 
+
 	private MessageBusImpl(){
-		serviceMap = new ConcurrentHashMap<>();
+		eventServiceMap = new ConcurrentHashMap<>();
+		broadcastServiceMap = new ConcurrentHashMap<>();
 		eventSubscribers = new ConcurrentHashMap<>();
 		broadcastSubscribers = new ConcurrentHashMap<>();
 		eventIndex = new ConcurrentHashMap<>();
 		futureEvents = new ConcurrentHashMap<>();
+	}
+
+	public static synchronized MessageBusImpl getInstance() {
+		if (instance==null)
+			instance = new MessageBusImpl();
+		return instance;
 	}
 
 	@Override
@@ -37,7 +48,7 @@ public class MessageBusImpl implements MessageBus {
 			eventSubscribers.get(type).add(m);
 		}
 		else{
-			List<MicroService> newType = new LinkedList<>();
+			CopyOnWriteArrayList<MicroService> newType = new CopyOnWriteArrayList<>();
 			newType.add(m);
 			eventSubscribers.put(type,newType);
 			eventIndex.put(type,new AtomicInteger(0));
@@ -51,7 +62,7 @@ public class MessageBusImpl implements MessageBus {
 			broadcastSubscribers.get(type).add(m);
 		}
 		else{
-			List<MicroService> newType = new LinkedList<>();
+			CopyOnWriteArrayList<MicroService> newType = new CopyOnWriteArrayList<>();
 			newType.add(m);
 			broadcastSubscribers.put(type,newType);
 		}
@@ -68,48 +79,79 @@ public class MessageBusImpl implements MessageBus {
 	@Override
 	public void sendBroadcast(Broadcast b) {
 		for (MicroService m : broadcastSubscribers.get(b.getClass())){
-			serviceMap.get(m).add(b);
+			broadcastServiceMap.get(m).add(b);
 		}
 	}
 
 	
 	@Override
 	public <T> Future<T> sendEvent(Event<T> e) {
-		{
-			List<MicroService> subscribers = eventSubscribers.get(e.getClass());
-			synchronized (subscribers) {
+		CopyOnWriteArrayList<MicroService> subscribers;
+		synchronized (eventSubscribers){
+			subscribers = eventSubscribers.get(e.getClass());
 				if (subscribers == null || subscribers.isEmpty())  //If there is no suitable Micro-Service
 					return null;
-				AtomicInteger index = eventIndex.get(e.getClass());  //Get last used index from subscribes list
-				int subIndex = index.getAndUpdate(i -> (i + 1) % subscribers.size());  //Get the curr index (int) and update next atomic index
-				serviceMap.get(subscribers.get(subIndex)).add(e);  //Add the event to the m queue by curr index
 			}
+			AtomicInteger index = eventIndex.get(e.getClass());  //Get last used index from subscribes list
+			int subIndex = index.getAndUpdate(i -> (i + 1) % subscribers.size());  //Get the curr index (int) and update next atomic index
+			eventServiceMap.get(subscribers.get(subIndex)).add(e);  //Add the event to the m queue by curr index
 			Future<T> future = new Future<>();
 			futureEvents.put(e, future);
 			return future;
-		}
 	}
+
 
 	@Override
 	public void register(MicroService m) {
-		BlockingQueue<Message> queue = new LinkedBlockingQueue<>();
-		serviceMap.put(m, queue);
-
-
+		BlockingQueue<Event> eventQueue = new LinkedBlockingQueue<>();
+		BlockingQueue<Broadcast> broadcastQueue = new LinkedBlockingQueue<>();
+		eventServiceMap.put(m, eventQueue);
+		broadcastServiceMap.put(m,broadcastQueue);
 	}
 
 	@Override
 	public void unregister(MicroService m) {
-		// TODO Auto-generated method stub
-
+		broadcastServiceMap.remove(m);  //deletes the broadcast queue
+		synchronized (eventServiceMap) {
+			if (!eventServiceMap.get(m).isEmpty()) {
+				for (Event e : eventServiceMap.get(m)) {  //transfer the events to the related microservice
+					sendEvent(e);
+				}
+			}
+			eventServiceMap.remove(m);  //deletes the event queue
+		}
+		//delete m in eventSubscribers
+		for (CopyOnWriteArrayList<MicroService> subscribers : eventSubscribers.values()) {
+			synchronized (subscribers){  //should be before for?
+				if (subscribers.contains(m)) {
+					subscribers.remove(m);
+				}
+			}
+		}
+		//delete m in broadcastSubscribers
+		for (CopyOnWriteArrayList<MicroService> subscribers : broadcastSubscribers.values()) {
+			synchronized (subscribers) {
+				if (subscribers.contains(m)) {
+					subscribers.remove(m);
+				}
+			}
+		}
 	}
 
 	@Override
 	public Message awaitMessage(MicroService m) throws InterruptedException {
-		// TODO Auto-generated method stub
-		return null;
+		while (eventServiceMap.get(m).isEmpty() && broadcastServiceMap.get(m).isEmpty()) {
+			try {
+				this.wait();
+			} catch (InterruptedException e) {
+				Thread.currentThread().interrupt();
+				return null;
+			}
+		}
+		if (!broadcastServiceMap.get(m).isEmpty()) {  //should be synchronized
+			return broadcastServiceMap.get(m).take();
+		}
+		else
+			return eventServiceMap.get(m).take();
 	}
-
-	
-
 }

@@ -32,7 +32,7 @@ public class Future<T> {
 				this.wait();
 			} catch (InterruptedException e) {
 				Thread.currentThread().interrupt();
-				//?
+				return null; //??
 			}
 		}
 		return result;
@@ -43,13 +43,13 @@ public class Future<T> {
      */
 	public synchronized void resolve (T result) {
 		this.result = result;
-		this.notify(); 			//all threads waiting for get
+		this.notifyAll(); 			//all threads waiting for get
 	}
 	
 	/**
      * @return true if this object has been resolved, false otherwise
      */
-	public synchronized boolean isDone() {
+	public synchronized boolean isDone() {  //remove synchronize?
 		if (result != null)
 			return true;
 		return false;
@@ -74,13 +74,13 @@ public class Future<T> {
 			try {
 				this.wait(remainingTime);
 			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt(); //?
-				//return null?
+				Thread.currentThread().interrupt(); //??
+				return null; //??
 			}
 			remainingTime = millisTimeOut - (System.currentTimeMillis() - startTime);  //calculates timout-(time duration from beginning)
 		}
 		if (remainingTime <= 0)
-			return null; 			//result = null?
+			return null;
 		return result;
 	}
 

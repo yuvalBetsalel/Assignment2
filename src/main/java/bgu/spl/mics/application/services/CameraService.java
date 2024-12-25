@@ -1,6 +1,7 @@
 package bgu.spl.mics.application.services;
 
 import bgu.spl.mics.MicroService;
+import bgu.spl.mics.application.objects.Camera;
 
 /**
  * CameraService is responsible for processing data from the camera and
