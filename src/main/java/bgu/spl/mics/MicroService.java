@@ -25,7 +25,7 @@ public abstract class MicroService implements Runnable {
 
     private boolean terminated = false;
     private final String name;
-    private ConcurrentHashMap<Class<? extends Message>,Callback> callBackMap;
+    private ConcurrentHashMap<Class<? extends Message>,Callback> callBackMap;  //Callback<MicroService>
     protected final MessageBusImpl messageBus = MessageBusImpl.getInstance();
 
 

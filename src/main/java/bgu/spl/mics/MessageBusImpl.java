@@ -18,11 +18,13 @@ import java.util.concurrent.atomic.AtomicInteger;
  * All other methods and members you add the class must be private.
  */
 public class MessageBusImpl implements MessageBus {
-	private static MessageBusImpl instance;
+	private static class MessageBusHolder {
+		private static MessageBusImpl instance = new MessageBusImpl();
+	}
 	private ConcurrentHashMap<MicroService, BlockingQueue<Event>> eventServiceMap;
 	private ConcurrentHashMap<MicroService, BlockingQueue<Broadcast>> broadcastServiceMap;
-	private ConcurrentHashMap<Class<? extends Event>, CopyOnWriteArrayList<MicroService>> eventSubscribers;
-	private ConcurrentHashMap<Class<? extends Broadcast>, CopyOnWriteArrayList <MicroService>> broadcastSubscribers;
+	private ConcurrentHashMap<Class<? extends Event>, CopyOnWriteArrayList<MicroService>> eventSubscribers;  //done
+	private ConcurrentHashMap<Class<? extends Broadcast>, CopyOnWriteArrayList <MicroService>> broadcastSubscribers; //done
 	private ConcurrentHashMap<Class<? extends Event>, AtomicInteger> eventIndex; //AtomicInteger is thread safe
 	private ConcurrentHashMap<Event, Future> futureEvents;
 
@@ -36,68 +38,67 @@ public class MessageBusImpl implements MessageBus {
 		futureEvents = new ConcurrentHashMap<>();
 	}
 
-	public static synchronized MessageBusImpl getInstance() {
-		if (instance==null)
-			instance = new MessageBusImpl();
-		return instance;
+	public static MessageBusImpl getInstance() {
+		return MessageBusHolder.instance;
 	}
 
 	@Override
 	public <T> void subscribeEvent(Class<? extends Event<T>> type, MicroService m) {
-		if (eventSubscribers.containsKey(type)){
-			eventSubscribers.get(type).add(m);
+		synchronized (eventSubscribers) { //synchronized (with itself) so 2 threads will not both make new lists for same type
+			if (eventSubscribers.containsKey(type)) {
+				eventSubscribers.get(type).add(m);
+			} else {
+				CopyOnWriteArrayList<MicroService> newType = new CopyOnWriteArrayList<>();
+				newType.add(m);
+				eventSubscribers.put(type, newType);
+				eventIndex.put(type, new AtomicInteger(0));
+			}
 		}
-		else{
-			CopyOnWriteArrayList<MicroService> newType = new CopyOnWriteArrayList<>();
-			newType.add(m);
-			eventSubscribers.put(type,newType);
-			eventIndex.put(type,new AtomicInteger(0));
-		}
-
 	}
 
 	@Override
 	public void subscribeBroadcast(Class<? extends Broadcast> type, MicroService m) {
-		if (broadcastSubscribers.containsKey(type)){
-			broadcastSubscribers.get(type).add(m);
+		synchronized (broadcastSubscribers) {
+			if (broadcastSubscribers.containsKey(type)) {
+				broadcastSubscribers.get(type).add(m);
+			} else {
+				CopyOnWriteArrayList<MicroService> newType = new CopyOnWriteArrayList<>();
+				newType.add(m);
+				broadcastSubscribers.put(type, newType);
+			}
 		}
-		else{
-			CopyOnWriteArrayList<MicroService> newType = new CopyOnWriteArrayList<>();
-			newType.add(m);
-			broadcastSubscribers.put(type,newType);
-		}
-
 	}
 
 	@Override
 	public <T> void complete(Event<T> e, T result) {
 		Future<T> currFuture = futureEvents.get(e);
 		currFuture.resolve(result); //resolved according to the result given as a parameter
-		//remove future and event from futureEvents?
 	}
 
 	@Override
 	public void sendBroadcast(Broadcast b) {
-		for (MicroService m : broadcastSubscribers.get(b.getClass())){
-			broadcastServiceMap.get(m).add(b);
+		CopyOnWriteArrayList<MicroService> subscribers = broadcastSubscribers.get(b.getClass());
+		synchronized (subscribers) { //synchronized with unregister
+			for (MicroService m : subscribers) {
+				broadcastServiceMap.get(m).add(b);
+			}
 		}
 	}
 
 	
 	@Override
 	public <T> Future<T> sendEvent(Event<T> e) {
-		CopyOnWriteArrayList<MicroService> subscribers;
-		synchronized (eventSubscribers){
-			subscribers = eventSubscribers.get(e.getClass());
-				if (subscribers == null || subscribers.isEmpty())  //If there is no suitable Micro-Service
-					return null;
-			}
+		CopyOnWriteArrayList<MicroService> subscribers = eventSubscribers.get(e.getClass());
+		synchronized (subscribers) {  //synchronized only with unregister
+			if (subscribers == null || subscribers.isEmpty())  //If there is no suitable Micro-Service
+				return null;
 			AtomicInteger index = eventIndex.get(e.getClass());  //Get last used index from subscribes list
 			int subIndex = index.getAndUpdate(i -> (i + 1) % subscribers.size());  //Get the curr index (int) and update next atomic index
 			eventServiceMap.get(subscribers.get(subIndex)).add(e);  //Add the event to the m queue by curr index
-			Future<T> future = new Future<>();
-			futureEvents.put(e, future);
-			return future;
+		}
+		Future<T> future = new Future<>();
+		futureEvents.put(e, future);
+		return future;
 	}
 
 
@@ -112,17 +113,18 @@ public class MessageBusImpl implements MessageBus {
 	@Override
 	public void unregister(MicroService m) {
 		broadcastServiceMap.remove(m);  //deletes the broadcast queue
-		synchronized (eventServiceMap) {
-			if (!eventServiceMap.get(m).isEmpty()) {
-				for (Event e : eventServiceMap.get(m)) {  //transfer the events to the related microservice
+		BlockingQueue<Event> eventQueue = eventServiceMap.get(m);
+		synchronized (eventQueue) {
+			if (!eventQueue.isEmpty()) {
+				for (Event e : eventQueue) {  //transfer the events to the related microservice
 					sendEvent(e);
 				}
 			}
-			eventServiceMap.remove(m);  //deletes the event queue
+			eventServiceMap.remove(m);  //deletes the event queue  //check this
 		}
 		//delete m in eventSubscribers
 		for (CopyOnWriteArrayList<MicroService> subscribers : eventSubscribers.values()) {
-			synchronized (subscribers){  //should be before for?
+			synchronized (subscribers) {  //synchronized only with send event
 				if (subscribers.contains(m)) {
 					subscribers.remove(m);
 				}
@@ -140,7 +142,7 @@ public class MessageBusImpl implements MessageBus {
 
 	@Override
 	public Message awaitMessage(MicroService m) throws InterruptedException {
-		while (eventServiceMap.get(m).isEmpty() && broadcastServiceMap.get(m).isEmpty()) {
+		while (eventServiceMap.get(m).isEmpty() && broadcastServiceMap.get(m).isEmpty()) { //check this
 			try {
 				this.wait();
 			} catch (InterruptedException e) {
@@ -151,7 +153,11 @@ public class MessageBusImpl implements MessageBus {
 		if (!broadcastServiceMap.get(m).isEmpty()) {  //should be synchronized
 			return broadcastServiceMap.get(m).take();
 		}
-		else
-			return eventServiceMap.get(m).take();
+		else {
+			BlockingQueue<Event> eventQueue = eventServiceMap.get(m);
+			synchronized (eventQueue) {
+				return eventQueue.take();
+			}
+		}
 	}
 }

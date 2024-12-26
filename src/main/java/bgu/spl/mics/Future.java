@@ -26,30 +26,32 @@ public class Future<T> {
      * @return return the result of type T if it is available, if not wait until it is available.
      * 	       
      */
-	public synchronized T get() {
-		while (!isDone()) {
-			try {
-				this.wait();
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt();
-				return null; //??
+	public T get() {
+		synchronized (this) {
+			while (!isDone()) {
+				try {
+					this.wait();
+				} catch (InterruptedException e) {
+					Thread.currentThread().interrupt();
+					return null;
+				}
 			}
+			return result;
 		}
-		return result;
     }
 	
 	/**
      * Resolves the result of this Future object.
      */
-	public synchronized void resolve (T result) {
+	public void resolve (T result) {  //no need to synchronize because there is only 1 result and no thread can make result null
 		this.result = result;
-		this.notifyAll(); 			//all threads waiting for get
+		this.notifyAll();
 	}
 	
 	/**
      * @return true if this object has been resolved, false otherwise
      */
-	public synchronized boolean isDone() {  //remove synchronize?
+	public boolean isDone() {   //if not synchronized then isDone may return false when true(but it's ok?)
 		if (result != null)
 			return true;
 		return false;
@@ -66,22 +68,24 @@ public class Future<T> {
      * 	       wait for {@code timeout} TimeUnits {@code unit}. If time has
      *         elapsed, return null.
      */
-	public synchronized T get(long timeout, TimeUnit unit) {
+	public T get(long timeout, TimeUnit unit) {
 		long startTime = System.currentTimeMillis();   //time measured at start
 		long millisTimeOut = unit.toMillis(timeout);   //convert timeout to millis
 		long remainingTime = millisTimeOut;
-		while (!isDone() && remainingTime > 0) {
-			try {
-				this.wait(remainingTime);
-			} catch (InterruptedException e) {
-				Thread.currentThread().interrupt(); //??
-				return null; //??
+		synchronized (this){
+			while (!isDone() && remainingTime > 0) {
+				try {
+					this.wait(remainingTime);
+				} catch (InterruptedException e) {
+					Thread.currentThread().interrupt();
+					return null;
+				}
+				remainingTime = millisTimeOut - (System.currentTimeMillis() - startTime);  //calculates timout-(time duration from beginning)
 			}
-			remainingTime = millisTimeOut - (System.currentTimeMillis() - startTime);  //calculates timout-(time duration from beginning)
+			if (remainingTime <= 0)
+				return null;
+			return result;
 		}
-		if (remainingTime <= 0)
-			return null;
-		return result;
 	}
 
 }
