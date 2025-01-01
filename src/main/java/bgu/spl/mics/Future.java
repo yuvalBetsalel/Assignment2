@@ -45,7 +45,7 @@ public class Future<T> {
      */
 	public void resolve (T result) {  //no need to synchronize because there is only 1 result and no thread can make result null
 		this.result = result;
-		this.notifyAll();
+		notifyAll();
 	}
 	
 	/**
@@ -87,6 +87,5 @@ public class Future<T> {
 			return result;
 		}
 	}
-
 }
 

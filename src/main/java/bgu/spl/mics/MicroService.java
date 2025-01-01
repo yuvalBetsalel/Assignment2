@@ -25,8 +25,9 @@ public abstract class MicroService implements Runnable {
 
     private boolean terminated = false;
     private final String name;
-    private ConcurrentHashMap<Class<? extends Message>,Callback> callBackMap;  //Callback<MicroService>
-    protected final MessageBusImpl messageBus = MessageBusImpl.getInstance();
+    private ConcurrentHashMap<Class<? extends Event>,Callback<?>> callBackEventMap;  //Callback<MicroService>
+    private ConcurrentHashMap<Class<? extends Broadcast>,Callback<?>> callBackBroadcastMap;
+    protected final MessageBusImpl messageBus;
 
 
     /**
@@ -35,7 +36,9 @@ public abstract class MicroService implements Runnable {
      */
     public MicroService(String name) {
         this.name = name;
-        callBackMap = new ConcurrentHashMap<>();
+        callBackEventMap = new ConcurrentHashMap<>();
+        callBackBroadcastMap = new ConcurrentHashMap<>();
+        messageBus = MessageBusImpl.getInstance();
     }
     /**
      * Subscribes to events of type {@code type} with the callback
@@ -60,7 +63,7 @@ public abstract class MicroService implements Runnable {
      */
     protected final <T, E extends Event<T>> void subscribeEvent(Class<E> type, Callback<E> callback) {
         //add callBack to map
-        callBackMap.put(type, callback);
+        callBackEventMap.put(type, callback);
         //subscribe event via message bus
         messageBus.subscribeEvent(type, this);
     }
@@ -87,7 +90,7 @@ public abstract class MicroService implements Runnable {
      */
     protected final <B extends Broadcast> void subscribeBroadcast(Class<B> type, Callback<B> callback) {
         //add callBack to map
-        callBackMap.put(type, callback);
+        callBackBroadcastMap.put(type, callback);
         //subscribe event via message bus
         messageBus.subscribeBroadcast(type, this);
     }
@@ -160,14 +163,26 @@ public abstract class MicroService implements Runnable {
     @Override
     public final void run() {
         initialize();
-
         while (!terminated) {
             try {
                 Message message = messageBus.awaitMessage(this);
-                callBackMap.get(message.getClass()).call(message);
+                if (message != null) {
+                    Callback<Message> callback;
+                    if (message instanceof Event) {
+                        callback = (Callback<Message>) callBackEventMap.get(message.getClass());
+                        if (callback != null)
+                            callback.call(message);
+                    }
+                    if (message instanceof Broadcast) {
+                        callback = (Callback<Message>) callBackBroadcastMap.get(message.getClass());
+                        if (callback != null)
+                            callback.call(message);
+                    }
+                }
             } catch (InterruptedException e) {
                 terminate();
             }
+            messageBus.unregister(this);
         }
     }
 }
