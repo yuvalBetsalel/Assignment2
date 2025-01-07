@@ -3,20 +3,16 @@ package bgu.spl.mics.application.objects;
 import java.util.List;
 
 public class CamerasConfigurations {
-    private List<Camera> cameras;
-    private String filePath;
+    private List<Camera> cameraList;
 
-    public CamerasConfigurations(List<Camera> cameras, String filePath){
-        this.cameras = cameras;
-        this.filePath = filePath;
+    public CamerasConfigurations(List<Camera> cameras){
+        cameraList = cameras;
     }
 
-    public List<Camera> getCameras() {
-        return cameras;
+    public List<Camera> getConfCameras() {
+        return cameraList;
     }
 
-    public String getFilePath() {
-        return filePath;
-    }
+
 }
 

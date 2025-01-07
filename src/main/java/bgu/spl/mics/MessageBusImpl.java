@@ -27,7 +27,6 @@ public class MessageBusImpl implements MessageBus {
 	private ConcurrentHashMap<Class<? extends Event>, AtomicInteger> eventIndex; //AtomicInteger is thread safe
 	private ConcurrentHashMap<Event, Future> futureEvents;
 
-
 	private MessageBusImpl() {
 		serviceMap = new ConcurrentHashMap<>();
 		eventSubscribers = new ConcurrentHashMap<>();

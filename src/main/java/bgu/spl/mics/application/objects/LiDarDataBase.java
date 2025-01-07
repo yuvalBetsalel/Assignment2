@@ -14,22 +14,21 @@ import java.util.List;
  */
 public class LiDarDataBase {
 
-
-    private static class LiDarDataBaseHolder {
-        private static LiDarDataBase instance = new LiDarDataBase();
-    }
-    private static String filePath ;
+    private static LiDarDataBase instance = null;
+//    private static class LiDarDataBaseHolder {
+//        private static LiDarDataBase instance = new LiDarDataBase();
+//    }
+    //private static String filePath ;
     private List<StampedCloudPoints> stampedCloudPoints;
 
-    private LiDarDataBase(){
-            filePath = "";
+    private LiDarDataBase(String filePath){
             stampedCloudPoints = new ArrayList<>();
-            loadLidarData();
+            loadLidarData(filePath);
     }
 
-    public static void setFilePath(String filePath) {
-        LiDarDataBase.filePath = filePath;
-    }
+//    public static void setFilePath(String filePath) {
+//        LiDarDataBase.filePath = filePath;
+//    }
 
     /**
      * Returns the singleton instance of LiDarDataBase.
@@ -38,8 +37,11 @@ public class LiDarDataBase {
      */
 
 
-    public static LiDarDataBase getInstance() {
-        return LiDarDataBaseHolder.instance;
+    public static LiDarDataBase getInstance(String filePath) {
+        if (instance == null){
+            instance = new LiDarDataBase(filePath);
+        }
+        return instance;
     }
 
     public List<StampedCloudPoints> getStampedCloudPoints() {
@@ -50,7 +52,7 @@ public class LiDarDataBase {
         return stampedCloudPoints.size();
     }
 
-    private void loadLidarData(){
+    private void loadLidarData(String filePath){
         Gson gson = new Gson();
         try (FileReader reader = new FileReader(filePath)) {
             Type LidarDataType = new TypeToken<List<StampedCloudPoints>>() {}.getType();

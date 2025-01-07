@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 
 /**
  * CameraService is responsible for processing data from the camera and
@@ -31,41 +32,23 @@ public class CameraService extends MicroService {
     private Map<Integer, List<DetectedObject>> waitingList;
     protected final StatisticalFolder statisticalFolder;
     private String filePath;
-
+    private CountDownLatch latch;
     /**
      * Constructor for CameraService.
      *
      * @param camera The Camera object that this service will use to detect objects.
      */
-    public CameraService(Camera camera) {
-        super("camera" + camera.getId());
+    public CameraService(Camera camera, CountDownLatch latch) {
+        super(camera.getCamera_key());
         this.camera = camera;
         statisticalFolder = StatisticalFolder.getInstance();
         waitingList = new ConcurrentHashMap<>();
         filePath = "";
+        this.latch = latch;
     }
 
     public void setFilePath(String filePath) {
         this.filePath = filePath;
-    }
-
-    private void loadCameraData() {
-        Gson gson = new Gson();
-        try (FileReader reader = new FileReader(filePath)) {
-            Type cameraDataType = new TypeToken<Map<String, List<StampedDetectedObjects>>>() {}.getType();
-            Map<String, List<StampedDetectedObjects>> cameraData = gson.fromJson(reader, cameraDataType);
-            for (Map.Entry<String, List<StampedDetectedObjects>> entry : cameraData.entrySet()){
-                String cameraId = entry.getKey();
-                if (cameraId.equals("camera"+camera.getId())){
-                    List<StampedDetectedObjects> stampedObjects = entry.getValue();
-                    for (StampedDetectedObjects stampedObj : stampedObjects) {
-                        camera.addStampedObject(stampedObj);
-                    }
-                }
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
     }
 
         private void terminateService(){
@@ -82,7 +65,7 @@ public class CameraService extends MicroService {
          */
         @Override
         protected void initialize () {
-            loadCameraData();
+            camera.loadCameraData(filePath);
             subscribeBroadcast(TickBroadcast.class, tick -> {
                 int currTick = tick.getCounter();
                 for (StampedDetectedObjects stampedObj : camera.getDetectedObjectList()){
@@ -101,23 +84,30 @@ public class CameraService extends MicroService {
                 if (waitingList.containsKey(currTick)){
                     StampedDetectedObjects stampedDetectedObjects = new StampedDetectedObjects(currTick- camera.getFrequency(),
                             waitingList.get(currTick));
-                    //Future<StampedDetectedObjects> future = ?
                     this.messageBus.sendEvent(new DetectObjectsEvent(stampedDetectedObjects));
                     statisticalFolder.addDetectedObjects();
                 }
-                if (camera.getDetectedObjectList().getLast().getTime() + camera.getFrequency() < currTick){
+                //check if we already processed all objects
+                int lastIndex = camera.getDetectedObjectList().size()-1;
+                if (camera.getDetectedObjectList().get(lastIndex).getTime() + camera.getFrequency() < currTick){
                     terminateService();
                 }
             });
+            System.out.println(camera.getCamera_key() + " has subscribed to tickBroadcast");
+
             subscribeBroadcast(TerminatedBroadcast.class, terminated -> {
                 MicroService m = terminated.getSender();
                 if (m instanceof TimeService) {
                     terminateService();
                 }
             });
+            System.out.println(camera.getCamera_key() + " has subscribed to terminateBroadcast");
+
             subscribeBroadcast(CrashedBroadcast.class, crashed -> {
                 terminateService();
             });
+            System.out.println(camera.getCamera_key() + " has subscribed to crashedBroadcast");
+            latch.countDown();
         }
 }
 

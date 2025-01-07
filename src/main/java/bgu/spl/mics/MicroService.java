@@ -2,6 +2,7 @@ package bgu.spl.mics;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 
 /**
  * The MicroService is an abstract class that any micro-service in the system
@@ -28,6 +29,7 @@ public abstract class MicroService implements Runnable {
     private ConcurrentHashMap<Class<? extends Event>,Callback<?>> callBackEventMap;  //Callback<MicroService>
     private ConcurrentHashMap<Class<? extends Broadcast>,Callback<?>> callBackBroadcastMap;
     protected final MessageBusImpl messageBus;
+    //protected final CountDownLatch latch;
 
 
     /**
@@ -39,6 +41,7 @@ public abstract class MicroService implements Runnable {
         callBackEventMap = new ConcurrentHashMap<>();
         callBackBroadcastMap = new ConcurrentHashMap<>();
         messageBus = MessageBusImpl.getInstance();
+        //this.latch = latch;
     }
     /**
      * Subscribes to events of type {@code type} with the callback
@@ -146,6 +149,7 @@ public abstract class MicroService implements Runnable {
      */
     protected final void terminate() {
         this.terminated = true;
+        messageBus.unregister(this);
     }
 
     /**
@@ -157,12 +161,14 @@ public abstract class MicroService implements Runnable {
     }
 
     /**
-     * The entry point of the micro-service. TODO: you must complete this code
+     * The entry point of the micro-service.
      * otherwise you will end up in an infinite loop.
      */
     @Override
     public final void run() {
+        messageBus.register(this); //why didnt we do it?
         initialize();
+        //messageBus.decreaseInitializeCounter();
         while (!terminated) {
             try {
                 Message message = messageBus.awaitMessage(this);
@@ -182,7 +188,6 @@ public abstract class MicroService implements Runnable {
             } catch (InterruptedException e) {
                 terminate();
             }
-            messageBus.unregister(this);
         }
     }
 }

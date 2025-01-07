@@ -8,33 +8,31 @@ import java.io.IOException;
 import java.util.List;
 
 public class Config {
-    private CamerasConfigurations camerasConfigurations;
-    private LidarConfigurations lidarConfigurations;
+    private Cameras Cameras;
+    private LiDarWorkers LiDarWorkers;
     private String poseJsonFile;
-    private int tickTime;
-    private int duration;
+    private int TickTime;
+    private int Duration;
 
     public int getDuration() {
-        return duration;
+        return Duration;
     }
 
     public int getTickTime() {
-        return tickTime;
+        return TickTime;
     }
 
-    public CamerasConfigurations getCamerasConfigurations() {
-        return camerasConfigurations;
+    public Cameras getCameras() {
+        return Cameras;
     }
 
     public String getPoseJsonFile() {
         return poseJsonFile;
     }
 
-    public LidarConfigurations getLidarConfigurations() {
-        return lidarConfigurations;
+    public LiDarWorkers getLiDarWorkers() {
+        return LiDarWorkers;
     }
-
-
 }
 
 

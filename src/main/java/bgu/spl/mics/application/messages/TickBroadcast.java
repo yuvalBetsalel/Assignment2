@@ -8,14 +8,10 @@ public class TickBroadcast implements Broadcast {
     private int counter;
 
     public TickBroadcast(int counter) {
-   //     this.senderId = senderId;
         this.counter = counter;
     }
 
     public int getCounter() {
         return counter;
     }
-//    public String getSenderId() {
-//        return senderId;
-//    }
 }

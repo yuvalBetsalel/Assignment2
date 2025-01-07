@@ -2,6 +2,8 @@ package bgu.spl.mics.application.objects;
 
 import bgu.spl.mics.MessageBusImpl;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 /**
  * Holds statistical information about the system's operation.
  * This class aggregates metrics such as the runtime of the system,
@@ -13,52 +15,52 @@ public class StatisticalFolder {
     }
 
 
-    private int systemRuntime;
-    private int numDetectedObjects;
-    private int numTrackedObjects;
-    private int numLandmarks;
+    private AtomicInteger systemRuntime;
+    private AtomicInteger numDetectedObjects;
+    private AtomicInteger numTrackedObjects;
+    private AtomicInteger numLandmarks;
 
     public StatisticalFolder(){
-        systemRuntime = 0;
-        numDetectedObjects= 0;
-        numTrackedObjects = 0;
-        numLandmarks = 0;
+        systemRuntime = new AtomicInteger(0);
+        numDetectedObjects= new AtomicInteger(0);
+        numTrackedObjects = new AtomicInteger(0);
+        numLandmarks = new AtomicInteger(0);
     }
 
     public static StatisticalFolder getInstance() {
         return StatisticalFolderHolder.instance;
     }
 
-    public int getSystemRuntime() {
+    public AtomicInteger getSystemRuntime() {
         return systemRuntime;
     }
 
-    public int getNumDetectedObjects() {
+    public AtomicInteger getNumDetectedObjects() {
         return numDetectedObjects;
     }
 
-    public int getNumTrackedObjects() {
+    public AtomicInteger getNumTrackedObjects() {
         return numTrackedObjects;
     }
 
-    public int getNumLandmarks() {
+    public AtomicInteger getNumLandmarks() {
         return numLandmarks;
     }
 
     public void setSystemRuntime(int systemRuntime) { // uses TimeService getCounter
-        this.systemRuntime = systemRuntime;
+        this.systemRuntime.set(systemRuntime);
     }
 
     public void addDetectedObjects(){
-        numDetectedObjects++;
+        this.numDetectedObjects.incrementAndGet();
     }
 
     public void addTrackedObjects(){
-        numTrackedObjects++;
+        this.numTrackedObjects.incrementAndGet();
     }
 
     public void addLandmarks(){
-        numLandmarks++;
+        this.numLandmarks.incrementAndGet();
     }
 
 }

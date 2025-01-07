@@ -17,12 +17,12 @@ public class LiDarWorkerTracker {
     protected final LiDarDataBase dataBase;
 
 
-    public LiDarWorkerTracker(int id, int frequency){
+    public LiDarWorkerTracker(int id, int frequency, String filePath){
         this.id = id;
         this.frequency = frequency;
         status = STATUS.UP;
         lastTrackedObjects = new ArrayList<>();
-        dataBase = LiDarDataBase.getInstance();
+        dataBase = LiDarDataBase.getInstance(filePath);
     }
 
     public int getId(){
@@ -45,9 +45,9 @@ public class LiDarWorkerTracker {
         this.status = status;
     }
 
-    public void setDataFile(String filePath){
-        dataBase.setFilePath(filePath);
-    }
+//    public void setDataFile(String filePath){
+//        dataBase.setFilePath(filePath);
+//    }
     /**
      * gets data from camera via DetectedObjectEvent and looks for the same objects coordinates at the specific time
      * adds the relevant tracked object to lastTrackedObjects list

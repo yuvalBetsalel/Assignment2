@@ -14,21 +14,24 @@ import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 
 /**
  * PoseService is responsible for maintaining the robot's current pose (position and orientation)
  * and broadcasting PoseEvents at every tick.
  */
 public class PoseService extends MicroService {
-    GPSIMU gpsimu;
+    private CountDownLatch latch;
+    private GPSIMU gpsimu; //private?
     /**
      * Constructor for PoseService.
      *
      * @param gpsimu The GPSIMU object that provides the robot's pose data.
      */
-    public PoseService(GPSIMU gpsimu) {
+    public PoseService(GPSIMU gpsimu, CountDownLatch latch) {
         super("Pose");
         this.gpsimu = gpsimu;
+        this.latch = latch;
     }
 
 
@@ -49,8 +52,12 @@ public class PoseService extends MicroService {
 
         subscribeBroadcast(TickBroadcast.class, tick -> {
             int currTick = tick.getCounter();
-            Pose currPose = gpsimu.getPoseList().get(currTick);
-            sendEvent(new PoseEvent<>(currPose));
+            if (currTick >= gpsimu.getPoseList().size())
+                terminateService();
+            else {
+                Pose currPose = gpsimu.getPoseList().get(currTick - 1);
+                sendEvent(new PoseEvent<>(currPose));
+            }
         });
 
         subscribeBroadcast(TerminatedBroadcast.class, terminated -> {
@@ -62,7 +69,7 @@ public class PoseService extends MicroService {
         subscribeBroadcast(CrashedBroadcast.class, crashed -> {
             terminateService();
         });
-
+        latch.countDown();
 
     }
 }
