@@ -1,18 +1,15 @@
 package bgu.spl.mics.application.services;
 
-import bgu.spl.mics.MicroService;
-import bgu.spl.mics.application.messages.*;
-import bgu.spl.mics.application.objects.*;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-
-import java.io.FileWriter;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CountDownLatch;
+
+import bgu.spl.mics.MicroService;
+import bgu.spl.mics.application.messages.CrashedBroadcast;
+import bgu.spl.mics.application.messages.PoseEvent;
+import bgu.spl.mics.application.messages.TerminatedBroadcast;
+import bgu.spl.mics.application.messages.TickBroadcast;
+import bgu.spl.mics.application.messages.TrackedObjectsEvent;
+import bgu.spl.mics.application.objects.FusionSlam;
+import bgu.spl.mics.application.objects.StatisticalFolder;
 
 /**
  * FusionSlamService integrates data from multiple sensors to build and update
@@ -46,13 +43,16 @@ public class FusionSlamService extends MicroService {
 
     public void removeFromCounter(){
         serviceCounter--;
-        if (serviceCounter == 0)
+        if (serviceCounter <= 0)
             fusionSlam.setRunning(false);
     }
 
     private void terminateService() {
+        //this.messageBus.sendBroadcast(new TerminatedBroadcast(this));
+        fusionSlam.setRunning(false);
         StatisticalFolder.getInstance().setSystemRuntime(time);
         fusionSlam.generateOutputFile();
+        System.out.println("[FusionSlamService] Output file generated successfully.");
         this.terminate(); //microService function
     }
 
@@ -68,47 +68,32 @@ public class FusionSlamService extends MicroService {
         });
 
         subscribeEvent(TrackedObjectsEvent.class, tracked -> {
-            // Process each tracked object
-            List<TrackedObject> trackedObjectList = tracked.getTrackedObjects();
-            for (TrackedObject trackedObject : trackedObjectList ){
-                boolean isFound = false;
-                if (time == trackedObject.getTime()){
-                    // Check if the tracked object corresponds to an existing landmark
-                    LandMark existingLandMark = fusionSlam.findMatchingLandMark(trackedObject);
-                    if (existingLandMark != null) {
-                        // Update the existing landmark with averaged coordinates
-                        fusionSlam.updateLandMarkCoordinates(existingLandMark, trackedObject);
-                    } else {
-                        // Create a new landmark and transform local coordinates to global
-                        LandMark newLandMark = fusionSlam.createNewLandMark(time, trackedObject);
-                        fusionSlam.addLandMark(newLandMark);
-                        //messageBus.complete(tracked, newLandMark);
-                        StatisticalFolder.getInstance().addLandmarks();
-                    }
-
-                }
-            }
+            fusionSlam.getAwaitingProcess().addAll(tracked.getTrackedObjects());
+            fusionSlam.process();
         });
 
         subscribeEvent(PoseEvent.class, pose -> {
            fusionSlam.addPoses(pose.getCurrPose());
-           //messageBus.complete(pose, pose.getCurrPose());  //???
+           fusionSlam.process();
         });
 
         subscribeBroadcast(TerminatedBroadcast.class, terminated -> { // wait for all sensors to send terminated broadcast??
             MicroService m = terminated.getSender();
-            if(!(m instanceof TimeService)) {
+            if((m instanceof CameraService) || (m instanceof LiDarService )) {
                 removeFromCounter();
-                if (serviceCounter == 0) {
-                    System.out.println("all services finished");
+                if (serviceCounter <= 0) {
+                    System.out.println("[FusionSlamService] All services finished. Terminating Fusion SLAM Service.");
+                    messageBus.sendBroadcast(new TerminatedBroadcast(this));
                     terminateService();
                 }
-            }
-            else
+            } else if (m instanceof TimeService) {
+                System.out.println("[FusionSlamService] Received TerminatedBroadcast from TimeService. Terminating Fusion SLAM Service.");
                 terminateService();
+            }
 
         });
         subscribeBroadcast(CrashedBroadcast.class, crashed -> {  // wait for all sensors to send terminated broadcast??
+            System.err.println("[FusionSlamService] Received CrashedBroadcast. Terminating Fusion SLAM Service.");
             terminateService(); //??
         });
     latch.countDown();

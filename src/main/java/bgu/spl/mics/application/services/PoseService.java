@@ -1,20 +1,15 @@
 package bgu.spl.mics.application.services;
 
+import java.util.concurrent.CountDownLatch;
+
 import bgu.spl.mics.MicroService;
-import bgu.spl.mics.application.messages.*;
+import bgu.spl.mics.application.messages.CrashedBroadcast;
+import bgu.spl.mics.application.messages.PoseEvent;
+import bgu.spl.mics.application.messages.TerminatedBroadcast;
+import bgu.spl.mics.application.messages.TickBroadcast;
 import bgu.spl.mics.application.objects.GPSIMU;
 import bgu.spl.mics.application.objects.Pose;
 import bgu.spl.mics.application.objects.STATUS;
-import bgu.spl.mics.application.objects.StampedDetectedObjects;
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
-
-import java.io.FileReader;
-import java.io.IOException;
-import java.lang.reflect.Type;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.CountDownLatch;
 
 /**
  * PoseService is responsible for maintaining the robot's current pose (position and orientation)
@@ -49,6 +44,8 @@ public class PoseService extends MicroService {
     @Override
     protected void initialize() {
         gpsimu.loadPoseData();
+        System.out.println("[PoseService] Pose data loaded. Total poses: " + gpsimu.getPoseList().size());
+
 
         subscribeBroadcast(TickBroadcast.class, tick -> {
             int currTick = tick.getCounter();
@@ -56,7 +53,9 @@ public class PoseService extends MicroService {
                 terminateService();
             else {
                 Pose currPose = gpsimu.getPoseList().get(currTick - 1);
-                sendEvent(new PoseEvent<>(currPose));
+                System.out.println("[PoseService] Broadcasting PoseEvent for pose at tick: " + currTick +
+                        " [x=" + currPose.getX() + ", y=" + currPose.getY() + ", yaw=" + currPose.getYaw() + "]");
+                sendEvent(new PoseEvent(currPose));
             }
         });
 

@@ -18,5 +18,4 @@ public class LiDarWorkers {
     public String getFilePath() {
         return lidars_data_path;
     }
-
 }

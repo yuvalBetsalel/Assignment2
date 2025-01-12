@@ -1,8 +1,6 @@
 package bgu.spl.mics;
 
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.CountDownLatch;
 
 /**
  * The MicroService is an abstract class that any micro-service in the system
@@ -111,6 +109,7 @@ public abstract class MicroService implements Runnable {
      * 	       			null in case no micro-service has subscribed to {@code e.getClass()}.
      */
     protected final <T> Future<T> sendEvent(Event<T> e) {
+        System.out.println("Sending event of class " + e.getClass());
         return messageBus.sendEvent(e);
     }
 
@@ -121,6 +120,7 @@ public abstract class MicroService implements Runnable {
      * @param b The broadcast message to send
      */
     protected final void sendBroadcast(Broadcast b) {
+        System.out.println("Sending broadcast of class " + b.getClass());
         messageBus.sendBroadcast(b);
     }
 

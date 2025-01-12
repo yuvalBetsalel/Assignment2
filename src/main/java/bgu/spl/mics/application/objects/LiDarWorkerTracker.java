@@ -2,7 +2,6 @@ package bgu.spl.mics.application.objects;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * LiDarWorkerTracker is responsible for managing a LiDAR worker.
@@ -15,6 +14,11 @@ public class LiDarWorkerTracker {
     private STATUS status;
     private List<TrackedObject> lastTrackedObjects;
     protected final LiDarDataBase dataBase;
+    //private List<StampedCloudPoints> waitingList;
+    //private Map<Integer, List<TrackedObject>> waitingList;
+
+
+
 
 
     public LiDarWorkerTracker(int id, int frequency, String filePath){
@@ -23,6 +27,7 @@ public class LiDarWorkerTracker {
         status = STATUS.UP;
         lastTrackedObjects = new ArrayList<>();
         dataBase = LiDarDataBase.getInstance(filePath);
+        //waitingList = new ConcurrentHashMap<>();
     }
 
     public int getId(){
@@ -41,10 +46,21 @@ public class LiDarWorkerTracker {
         return dataBase;
     }
 
+//    public Map<Integer, List<TrackedObject>> getWaitingList() {
+//        return waitingList;
+//    }
+//
+//    public void addToWaitingList(StampedCloudPoints stampedCloudPoints){
+//        waitingList.add(stampedCloudPoints);
+//    }
+
     public void setStatus(STATUS status) {
         this.status = status;
     }
 
+    public void deleteLastTracked(List<TrackedObject> trackedObjects){
+        lastTrackedObjects.removeAll(trackedObjects);
+    }
 //    public void setDataFile(String filePath){
 //        dataBase.setFilePath(filePath);
 //    }
@@ -53,32 +69,87 @@ public class LiDarWorkerTracker {
      * adds the relevant tracked object to lastTrackedObjects list
      *
      */
-    public List<TrackedObject> checkData(StampedDetectedObjects stampedDetectedObjects){
+    public  void checkData(StampedDetectedObjects stampedDetectedObjects){
         int time = stampedDetectedObjects.getTime();
         List<DetectedObject> objects = stampedDetectedObjects.getDetectedObjects();
-        //search for obj with same time as time
         for (StampedCloudPoints stampedCloudPoints : dataBase.getStampedCloudPoints()){
             if (time == stampedCloudPoints.getTime()){
-                //search for obj with same id
                 for (DetectedObject obj : objects){
-                    if (obj.equals(stampedCloudPoints.getId())){
-                        //found obj with same time and same id
+                    if (obj.getId().equals(stampedCloudPoints.getId())){
                         TrackedObject newTrackedObj = new TrackedObject(obj.getId(), time, obj.getDescription());
-                        //add all coordinates to tracked obj
                         for (List<Double> coordinates : stampedCloudPoints.getCloudPoints()){
                             CloudPoint newCloudPoint = new CloudPoint(coordinates.get(0), coordinates.get(1));
                             newTrackedObj.addCloudPoint(newCloudPoint);
                         }
-                        //add tracked obj to lastTrackedObjects list
                         lastTrackedObjects.add(newTrackedObj);
+                        System.out.println(time + " objects: " + lastTrackedObjects);
                     }
                 }
             }
         }
-        return lastTrackedObjects;
+//        //add tracked obj to waiting list with key - time to send (detected time + freq)
+//        if (!waitingList.containsKey(time + frequency)) {
+//            waitingList.put(time + frequency, newTrackedObjects);
+//        }
+//        else{       //if there is already objects with same key (not sure if needed!)
+//            List<TrackedObject> oldList = waitingList.get(time + frequency);
+//            oldList.addAll(newTrackedObjects);
+//            waitingList.replace(time + frequency, oldList);
+//        }
+        //return lastTrackedObjects;
+    }
+
+    public List<TrackedObject> searchTrackedObjects(int currTick){
+        List<TrackedObject> trackedObjectList = new ArrayList<>();
+
+        //search trackedObjects list for relevant objects to send
+        for (TrackedObject object : lastTrackedObjects ){
+
+            //currTick is at least Detection time + lidar_frequency
+            if (currTick >= object.getTime() + frequency){
+                if (object.getId().equals("ERROR")){
+                    System.err.println("[LiDAR Worker " + id + "] ERROR detected: "
+                            + object.getDescription() + ". Terminating service.");
+                    status = STATUS.ERROR;
+                    return null;
+                }
+                trackedObjectList.add(object);
+//                    System.out.println("[LiDAR Worker " + liDarWorkerTracker.getId() + "] Processing object ID: "
+//                            + object.getId() + " at tick: " + currTick);
+            }
+        }
+        return trackedObjectList;
     }
 
 //    public void addTrackedObject (TrackedObject object) {
 //        lastTrackedObjects.add(object);
 //    }
+
+    public List<TrackedObject> canSendTrackedObjects (int currTick){
+        List<TrackedObject> trackedObjectList = new ArrayList<>();
+        //search trackedObjects list for relevant objects to send
+        for (TrackedObject object : lastTrackedObjects){
+            //currTick is at least Detection time + lidar_frequency
+            if (currTick >= object.getTime() + frequency){
+                if (object.getId().equals("ERROR")){
+                    status = STATUS.ERROR;
+                    return null;
+                }
+                trackedObjectList.add(object);
+                dataBase.incTracked();
+            }
+        }
+        if (!trackedObjectList.isEmpty()) {
+            System.out.println("[LiDAR Worker " + id + "] Sending "
+                    + trackedObjectList.size() + " tracked objects. Latest object time: "
+                    + trackedObjectList.get(trackedObjectList.size() - 1).getTime());
+            lastTrackedObjects.removeAll(trackedObjectList);
+        }
+        return trackedObjectList;
+    }
+
+    public boolean isFinished() {
+        return dataBase.isFinished();
+    }
 }
+

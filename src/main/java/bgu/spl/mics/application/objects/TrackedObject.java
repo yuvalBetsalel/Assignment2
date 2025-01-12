@@ -1,9 +1,7 @@
 package bgu.spl.mics.application.objects;
 
-import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * Represents an object tracked by the LiDAR.
@@ -42,4 +40,10 @@ public class TrackedObject {
     public void addCloudPoint(CloudPoint cloudPoint){
         coordinates.add(cloudPoint);
     }
+
+    @Override
+    public String toString() {
+        return "{" + id +"," +time + "}";
+    }
+    
 }

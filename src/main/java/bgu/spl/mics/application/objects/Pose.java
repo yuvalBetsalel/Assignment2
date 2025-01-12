@@ -28,4 +28,14 @@ public class Pose {
     public float getYaw() {
         return yaw;
     }
+
+    public int getTime() {
+        return time;
+    }
+
+    @Override
+    public String toString() {
+        return "time: " + time + ", " + "x: " + x + ", " + "y: " + y + ", " + "yaw: " + yaw;
+    }
+    
 }

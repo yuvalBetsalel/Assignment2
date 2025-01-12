@@ -1,11 +1,11 @@
 package bgu.spl.mics.application.services;
 
+import java.util.concurrent.CountDownLatch;
+
 import bgu.spl.mics.MicroService;
 import bgu.spl.mics.application.messages.TerminatedBroadcast;
 import bgu.spl.mics.application.messages.TickBroadcast;
 import bgu.spl.mics.application.objects.FusionSlam;
-
-import java.util.concurrent.CountDownLatch;
 
 /**
  * TimeService acts as the global timer for the system, broadcasting TickBroadcast messages
@@ -36,15 +36,22 @@ public class    TimeService extends MicroService {
      */
     @Override
     protected void initialize() {
+//        subscribeBroadcast(TerminatedBroadcast.class, terminated -> {
+//            MicroService m = terminated.getSender();
+//            if (m instanceof FusionSlamService) {
+//                terminate();
+//            }
+//        });
+
         //if (messageBus.getInitializeCounter() == 0) {
             try {
                 latch.await();
                 System.out.println("all services are initialized");
                 while (counter < duration && FusionSlam.getInstance().isRunning()) {
+                    Thread.sleep(tickTime*100);// Sleep for tickTime to simulate real-time ticking
                     sendBroadcast(new TickBroadcast(counter)); // Broadcast the current tick
                     System.out.println("sent tick " + counter);
                     counter++;
-                    Thread.sleep(tickTime); // Sleep for tickTime to simulate real-time ticking
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -52,7 +59,8 @@ public class    TimeService extends MicroService {
             this.messageBus.sendBroadcast(new TerminatedBroadcast(this));
             System.out.println("time service is done");
             terminate(); // Signal termination after the duration
-    }
 
+
+    }
 }
 

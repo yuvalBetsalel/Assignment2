@@ -1,7 +1,5 @@
 package bgu.spl.mics.application.objects;
 
-import bgu.spl.mics.MessageBusImpl;
-
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -51,12 +49,12 @@ public class StatisticalFolder {
         this.systemRuntime.set(systemRuntime);
     }
 
-    public void addDetectedObjects(){
-        this.numDetectedObjects.incrementAndGet();
+    public void addDetectedObjects(int i){
+        this.numDetectedObjects.addAndGet(i);
     }
 
-    public void addTrackedObjects(){
-        this.numTrackedObjects.incrementAndGet();
+    public void addTrackedObjects(int i){
+        this.numTrackedObjects.addAndGet(i);
     }
 
     public void addLandmarks(){

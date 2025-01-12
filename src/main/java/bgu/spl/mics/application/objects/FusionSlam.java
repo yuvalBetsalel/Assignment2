@@ -1,9 +1,5 @@
 package bgu.spl.mics.application.objects;
 
-import bgu.spl.mics.MessageBusImpl;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -12,6 +8,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 
 /**
  * Manages the fusion of sensor data for simultaneous localization and mapping (SLAM).
@@ -26,17 +25,24 @@ public class FusionSlam {
     private List<LandMark> landmarks;
     private List<Pose> poses;
     private boolean isRunning;
+    private List<TrackedObject> awaitingProcess;
+    private String baseDirectory;
     protected final StatisticalFolder statisticalFolder;
 
 
-    public FusionSlam(){
+    private FusionSlam(){
         landmarks = new ArrayList<>();
         poses = new ArrayList<>();
         isRunning = true;
         statisticalFolder = StatisticalFolder.getInstance();
-
-
+        awaitingProcess = new ArrayList<>();
+        baseDirectory = "";
     }
+
+    public void setBaseDirectory(String baseDirectory) {
+        this.baseDirectory = baseDirectory;
+    }
+
     public static FusionSlam getInstance(){
         return FusionSlamHolder.instance;
     }
@@ -85,21 +91,29 @@ public class FusionSlam {
      * @param landMark      The landmark to update.
      * @param trackedObject The tracked object providing the new coordinates.
      */
-    public void updateLandMarkCoordinates(LandMark landMark, TrackedObject trackedObject) {
-        for (int i = 0; i < landMark.getCoordinates().size(); i++) {
+    public void updateLandMarkCoordinates(LandMark landMark, List<CloudPoint> cloudpoints) {
+        for (int i = 0; i < cloudpoints.size(); i++) {
             Double newX = (landMark.getCoordinates().get(i).getX()
-                    + trackedObject.getCoordinates().get(i).getX()) / 2;
+                    + cloudpoints.get(i).getX()) / 2;
             Double newY = (landMark.getCoordinates().get(i).getY()
-                    + trackedObject.getCoordinates().get(i).getY()) / 2;
+                    + cloudpoints.get(i).getY()) / 2;
 
             CloudPoint newCloudPoint = new CloudPoint(newX, newY);
             landMark.setCoordinates(i, newCloudPoint);
         }
-        if (landMark.getCoordinates().size() < trackedObject.getCoordinates().size()){
-            for (int i = landMark.getCoordinates().size() ; i < trackedObject.getCoordinates().size(); i++){
-                landMark.setCoordinates(i, trackedObject.getCoordinates().get(i));
+        if (cloudpoints.size() < cloudpoints.size()){
+            for (int i = landMark.getCoordinates().size() ; i < cloudpoints.size(); i++){
+                landMark.setCoordinates(i, cloudpoints.get(i));
             }
         }
+    }
+
+    public Pose getPose(int time){
+        for(Pose p: poses){
+            if(p.getTime() == time)
+                return p;
+        }
+        return null;
     }
 
     /**
@@ -109,9 +123,12 @@ public class FusionSlam {
      */
     public LandMark createNewLandMark(int time, TrackedObject trackedObject) {
         // Retrieve the robot's pose at the given time from Fusion-SLAM
-        Double xRobot = (double) poses.get(time).getX();
-        Double yRobot = (double) poses.get(time).getY();
-        Double yawRobot = (double) poses.get(time).getYaw();
+        Pose pose = getPose(time);
+        if(pose == null) return null;
+        System.out.println("current pose: " + pose + " tracked object: " + trackedObject);
+        Double xRobot = (double) pose.getX();
+        Double yRobot = (double) pose.getY();
+        Double yawRobot = (double) pose.getYaw();
         yawRobot = Math.toRadians(yawRobot);
         Double cosYaw = Math.cos(yawRobot);
         Double sinYaw = Math.sin(yawRobot);
@@ -148,7 +165,8 @@ public class FusionSlam {
         outputData.put("landMarks", newLandmarks);
         // Serialize to JSON and write to file
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
-        String outputFilePath = "output_file.json"; // Define file path
+        String outputFilePath = baseDirectory + "output_file_Y&H.json"; // Define file path //add location
+        System.out.println("saving to " + outputFilePath);
         try (FileWriter writer = new FileWriter(outputFilePath)) {
             gson.toJson(outputData, writer);
             System.out.println("Output file generated successfully: " + outputFilePath);
@@ -168,5 +186,33 @@ public class FusionSlam {
             e.printStackTrace();
         }
 
+    }
+
+    public void process(){
+        List<TrackedObject> copyList = new ArrayList<>(awaitingProcess);
+        for (TrackedObject trackedObject : copyList ){
+            if(getPose(trackedObject.getTime()) == null){
+                continue;
+            }
+            awaitingProcess.remove(trackedObject);
+            LandMark existingLandMark = findMatchingLandMark(trackedObject);
+            if (existingLandMark != null) {
+                // Update the existing landmark with averaged coordinates
+                //System.out.println("[FusionSlamService] Updating existing landmark: " + existingLandMark.getId());
+                LandMark newLandMark = createNewLandMark(trackedObject.getTime(), trackedObject);
+                updateLandMarkCoordinates(existingLandMark, newLandMark.getCoordinates());
+            } else {
+                // Create a new landmark and transform local coordinates to global
+                System.out.println("[FusionSlamService] Creating new landmark for tracked object: " + trackedObject.getId());
+                LandMark newLandMark = createNewLandMark(trackedObject.getTime(), trackedObject);
+                addLandMark(newLandMark);
+                //messageBus.complete(tracked, newLandMark);
+                StatisticalFolder.getInstance().addLandmarks();
+            }
+        }
+    }
+
+    public List<TrackedObject> getAwaitingProcess() {
+        return awaitingProcess;
     }
 }
