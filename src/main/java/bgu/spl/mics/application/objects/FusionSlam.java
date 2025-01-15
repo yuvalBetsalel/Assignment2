@@ -89,7 +89,7 @@ public class FusionSlam {
      * Updates the coordinates of an existing landmark by averaging with a tracked object.
      *
      * @param landMark      The landmark to update.
-     * @param trackedObject The tracked object providing the new coordinates.
+     * @param cloudpoints The cloud points of the tracked object providing the new coordinates.
      */
     public void updateLandMarkCoordinates(LandMark landMark, List<CloudPoint> cloudpoints) {
         for (int i = 0; i < cloudpoints.size(); i++) {
@@ -145,46 +145,57 @@ public class FusionSlam {
         return new LandMark(trackedObject.getId(), trackedObject.getDescription(), newCoordinates);
     }
 
-    public void generateOutputFile(){
-        // Prepare data to serialize
-        Map<String, Object> outputData = new HashMap<>();
-        // Add statistics
-        outputData.put("systemRuntime", statisticalFolder.getSystemRuntime());
-        outputData.put("numDetectedObjects", statisticalFolder.getNumDetectedObjects());
-        outputData.put("numTrackedObjects", statisticalFolder.getNumTrackedObjects());
-        outputData.put("numLandmarks", statisticalFolder.getNumLandmarks());
-        // Add landmarks
-        Map<String, Object> newLandmarks = new HashMap<>();
-        for (LandMark landmark : landmarks) {
-            Map<String, Object> landmarkData = new HashMap<>();
-            landmarkData.put("id", landmark.getId());
-            landmarkData.put("description", landmark.getDescription());
-            landmarkData.put("coordinates", landmark.getCoordinates());
-            newLandmarks.put(landmark.getId(), landmarkData);
+    public void generateErrorOutput(){
+        Gson gson = new GsonBuilder().setPrettyPrinting().create();
+        String outputFilePath = baseDirectory + "error_output_Y&H.json"; // Define file path
+        try (FileWriter writer = new FileWriter(outputFilePath)) {
+            gson.toJson(ErrorOutput.getInstance(), writer);
+            System.out.println("Error Output file generated successfully: " + outputFilePath);
+        } catch (IOException e) {
+            e.printStackTrace();
         }
-        outputData.put("landMarks", newLandmarks);
+    }
+
+    public void generateOutputFile(){
+//        // Prepare data to serialize
+//        Map<String, Object> outputData = new HashMap<>();
+//        // Add statistics
+//        outputData.put("systemRuntime", statisticalFolder.getSystemRuntime());
+//        outputData.put("numDetectedObjects", statisticalFolder.getNumDetectedObjects());
+//        outputData.put("numTrackedObjects", statisticalFolder.getNumTrackedObjects());
+//        outputData.put("numLandmarks", statisticalFolder.getNumLandmarks());
+//        // Add landmarks
+//        Map<String, Object> newLandmarks = new HashMap<>();
+//        for (LandMark landmark : landmarks) {
+//            Map<String, Object> landmarkData = new HashMap<>();
+//            landmarkData.put("id", landmark.getId());
+//            landmarkData.put("description", landmark.getDescription());
+//            landmarkData.put("coordinates", landmark.getCoordinates());
+//            newLandmarks.put(landmark.getId(), landmarkData);
+//        }
+//        outputData.put("landMarks", newLandmarks);
         // Serialize to JSON and write to file
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
-        String outputFilePath = baseDirectory + "output_file_Y&H.json"; // Define file path //add location
+        String outputFilePath = baseDirectory + "output_file_Y&H.json"; // Define file path
         System.out.println("saving to " + outputFilePath);
         try (FileWriter writer = new FileWriter(outputFilePath)) {
-            gson.toJson(outputData, writer);
+            gson.toJson(statisticalFolder, writer);
             System.out.println("Output file generated successfully: " + outputFilePath);
         } catch (IOException e) {
             e.printStackTrace();
         }
         // Read the file and print its contents
-        try (FileReader reader = new FileReader(outputFilePath)) {
-            // Read the contents of the file
-            BufferedReader bufferedReader = new BufferedReader(reader);
-            String line;
-            System.out.println("Content of the output file:");
-            while ((line = bufferedReader.readLine()) != null) {
-                System.out.println(line);
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+//        try (FileReader reader = new FileReader(outputFilePath)) {
+//            // Read the contents of the file
+//            BufferedReader bufferedReader = new BufferedReader(reader);
+//            String line;
+//            System.out.println("Content of the output file:");
+//            while ((line = bufferedReader.readLine()) != null) {
+//                System.out.println(line);
+//            }
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        }
 
     }
 
@@ -198,7 +209,6 @@ public class FusionSlam {
             LandMark existingLandMark = findMatchingLandMark(trackedObject);
             if (existingLandMark != null) {
                 // Update the existing landmark with averaged coordinates
-                //System.out.println("[FusionSlamService] Updating existing landmark: " + existingLandMark.getId());
                 LandMark newLandMark = createNewLandMark(trackedObject.getTime(), trackedObject);
                 updateLandMarkCoordinates(existingLandMark, newLandMark.getCoordinates());
             } else {

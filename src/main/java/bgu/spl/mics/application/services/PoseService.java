@@ -7,6 +7,7 @@ import bgu.spl.mics.application.messages.CrashedBroadcast;
 import bgu.spl.mics.application.messages.PoseEvent;
 import bgu.spl.mics.application.messages.TerminatedBroadcast;
 import bgu.spl.mics.application.messages.TickBroadcast;
+import bgu.spl.mics.application.objects.ErrorOutput;
 import bgu.spl.mics.application.objects.GPSIMU;
 import bgu.spl.mics.application.objects.Pose;
 import bgu.spl.mics.application.objects.STATUS;
@@ -18,6 +19,8 @@ import bgu.spl.mics.application.objects.STATUS;
 public class PoseService extends MicroService {
     private CountDownLatch latch;
     private GPSIMU gpsimu; //private?
+    protected final ErrorOutput errorOutput;
+
     /**
      * Constructor for PoseService.
      *
@@ -27,6 +30,7 @@ public class PoseService extends MicroService {
         super("Pose");
         this.gpsimu = gpsimu;
         this.latch = latch;
+        errorOutput = ErrorOutput.getInstance();
     }
 
 
@@ -55,6 +59,7 @@ public class PoseService extends MicroService {
                 Pose currPose = gpsimu.getPoseList().get(currTick - 1);
                 System.out.println("[PoseService] Broadcasting PoseEvent for pose at tick: " + currTick +
                         " [x=" + currPose.getX() + ", y=" + currPose.getY() + ", yaw=" + currPose.getYaw() + "]");
+                errorOutput.setPoses(gpsimu.getPoseList().subList(0,currTick));
                 sendEvent(new PoseEvent(currPose));
             }
         });

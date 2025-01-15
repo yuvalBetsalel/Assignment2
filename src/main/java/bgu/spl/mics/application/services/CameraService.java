@@ -10,11 +10,7 @@ import bgu.spl.mics.application.messages.CrashedBroadcast;
 import bgu.spl.mics.application.messages.DetectObjectsEvent;
 import bgu.spl.mics.application.messages.TerminatedBroadcast;
 import bgu.spl.mics.application.messages.TickBroadcast;
-import bgu.spl.mics.application.objects.Camera;
-import bgu.spl.mics.application.objects.DetectedObject;
-import bgu.spl.mics.application.objects.STATUS;
-import bgu.spl.mics.application.objects.StampedDetectedObjects;
-import bgu.spl.mics.application.objects.StatisticalFolder;
+import bgu.spl.mics.application.objects.*;
 
 /**
  * CameraService is responsible for processing data from the camera and
@@ -28,6 +24,7 @@ public class CameraService extends MicroService {
     //private Event<? extends Object> DetectObjectsEvent;
     private Map<Integer, List<DetectedObject>> waitingList;
     protected final StatisticalFolder statisticalFolder;
+    protected final ErrorOutput errorOutput;
     private String filePath;
     private CountDownLatch latch;
     /**
@@ -39,6 +36,7 @@ public class CameraService extends MicroService {
         super(camera.getCamera_key());
         this.camera = camera;
         statisticalFolder = StatisticalFolder.getInstance();
+        errorOutput = ErrorOutput.getInstance();
         waitingList = new ConcurrentHashMap<>();
         filePath = "";
         this.latch = latch;
@@ -75,6 +73,9 @@ public class CameraService extends MicroService {
                                 System.err.println("[Camera " + camera.getCamera_key() + "] ERROR detected: "
                                         + obj.getDescription() + " at tick: " + currTick);
                                 camera.setStatus(STATUS.ERROR);
+                                errorOutput.setError(obj.getDescription());
+                                errorOutput.setFaultySensor(camera.getCamera_key());
+                                statisticalFolder.setSystemRuntime(currTick);
                                 sendBroadcast(new CrashedBroadcast(this));
                                 terminate();
                             }
@@ -89,8 +90,10 @@ public class CameraService extends MicroService {
                             waitingList.get(currTick));
                     System.out.println("[Camera " + camera.getCamera_key() + "] Sending detected objects of time: "
                             + stampedDetectedObjects.getTime() + " at tick: " + currTick);
-                    sendEvent(new DetectObjectsEvent(stampedDetectedObjects));
                     statisticalFolder.addDetectedObjects(stampedDetectedObjects.getDetectedObjects().size());
+                    if (camera.getStatus().equals(STATUS.UP))
+                        errorOutput.addCameraFrame(stampedDetectedObjects, camera.getCamera_key());
+                    sendEvent(new DetectObjectsEvent(stampedDetectedObjects));
                 }
                 //check if we already processed all objects
                 int lastIndex = camera.getDetectedObjectList().size()-1;

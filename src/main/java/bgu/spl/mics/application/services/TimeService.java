@@ -47,7 +47,7 @@ public class    TimeService extends MicroService {
             try {
                 latch.await();
                 System.out.println("all services are initialized");
-                while (counter < duration && FusionSlam.getInstance().isRunning()) {
+                while (counter <= duration && FusionSlam.getInstance().isRunning()) {
                     Thread.sleep(tickTime*100);// Sleep for tickTime to simulate real-time ticking
                     sendBroadcast(new TickBroadcast(counter)); // Broadcast the current tick
                     System.out.println("sent tick " + counter);

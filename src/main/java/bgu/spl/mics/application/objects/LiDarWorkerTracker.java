@@ -14,6 +14,7 @@ public class LiDarWorkerTracker {
     private STATUS status;
     private List<TrackedObject> lastTrackedObjects;
     protected final LiDarDataBase dataBase;
+    protected final ErrorOutput errorOutput;
     //private List<StampedCloudPoints> waitingList;
     //private Map<Integer, List<TrackedObject>> waitingList;
 
@@ -27,7 +28,7 @@ public class LiDarWorkerTracker {
         status = STATUS.UP;
         lastTrackedObjects = new ArrayList<>();
         dataBase = LiDarDataBase.getInstance(filePath);
-        //waitingList = new ConcurrentHashMap<>();
+        errorOutput = ErrorOutput.getInstance();
     }
 
     public int getId(){
@@ -99,27 +100,27 @@ public class LiDarWorkerTracker {
         //return lastTrackedObjects;
     }
 
-    public List<TrackedObject> searchTrackedObjects(int currTick){
-        List<TrackedObject> trackedObjectList = new ArrayList<>();
-
-        //search trackedObjects list for relevant objects to send
-        for (TrackedObject object : lastTrackedObjects ){
-
-            //currTick is at least Detection time + lidar_frequency
-            if (currTick >= object.getTime() + frequency){
-                if (object.getId().equals("ERROR")){
-                    System.err.println("[LiDAR Worker " + id + "] ERROR detected: "
-                            + object.getDescription() + ". Terminating service.");
-                    status = STATUS.ERROR;
-                    return null;
-                }
-                trackedObjectList.add(object);
-//                    System.out.println("[LiDAR Worker " + liDarWorkerTracker.getId() + "] Processing object ID: "
-//                            + object.getId() + " at tick: " + currTick);
-            }
-        }
-        return trackedObjectList;
-    }
+//    public List<TrackedObject> searchTrackedObjects(int currTick){
+//        List<TrackedObject> trackedObjectList = new ArrayList<>();
+//
+//        //search trackedObjects list for relevant objects to send
+//        for (TrackedObject object : lastTrackedObjects ){
+//
+//            //currTick is at least Detection time + lidar_frequency
+//            if (currTick >= object.getTime() + frequency){
+//                if (object.getId().equals("ERROR")){
+//                    System.err.println("[LiDAR Worker " + id + "] ERROR detected: "
+//                            + object.getDescription() + ". Terminating service.");
+//                    status = STATUS.ERROR;
+//                    return null;
+//                }
+//                trackedObjectList.add(object);
+////                    System.out.println("[LiDAR Worker " + liDarWorkerTracker.getId() + "] Processing object ID: "
+////                            + object.getId() + " at tick: " + currTick);
+//            }
+//        }
+//        return trackedObjectList;
+//    }
 
 //    public void addTrackedObject (TrackedObject object) {
 //        lastTrackedObjects.add(object);
@@ -133,6 +134,9 @@ public class LiDarWorkerTracker {
             if (currTick >= object.getTime() + frequency){
                 if (object.getId().equals("ERROR")){
                     status = STATUS.ERROR;
+                    errorOutput.setError(object.getDescription());
+                    errorOutput.setFaultySensor("LiDarWorkerTracker" + id);
+                    StatisticalFolder.getInstance().setSystemRuntime(currTick);
                     return null;
                 }
                 trackedObjectList.add(object);

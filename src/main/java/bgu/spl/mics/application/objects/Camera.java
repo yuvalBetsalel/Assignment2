@@ -48,6 +48,10 @@ public class Camera {
         return camera_key;
     }
 
+    public STATUS getStatus() {
+        return status;
+    }
+
     public void setStatus(STATUS status){
         this.status = status;
     }

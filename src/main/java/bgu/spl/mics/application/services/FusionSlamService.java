@@ -51,6 +51,7 @@ public class FusionSlamService extends MicroService {
         //this.messageBus.sendBroadcast(new TerminatedBroadcast(this));
         fusionSlam.setRunning(false);
         StatisticalFolder.getInstance().setSystemRuntime(time);
+        StatisticalFolder.getInstance().setLandMarks(fusionSlam.getLandmarks());
         fusionSlam.generateOutputFile();
         System.out.println("[FusionSlamService] Output file generated successfully.");
         this.terminate(); //microService function
@@ -94,7 +95,8 @@ public class FusionSlamService extends MicroService {
         });
         subscribeBroadcast(CrashedBroadcast.class, crashed -> {  // wait for all sensors to send terminated broadcast??
             System.err.println("[FusionSlamService] Received CrashedBroadcast. Terminating Fusion SLAM Service.");
-            terminateService(); //??
+            fusionSlam.generateErrorOutput();
+            terminateService();
         });
     latch.countDown();
     }
