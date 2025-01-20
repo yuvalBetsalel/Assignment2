@@ -46,6 +46,9 @@ public class MessageBusImpl implements MessageBus {
 		return broadcastSubscribers;
 	}
 
+	public ConcurrentHashMap<Class<? extends Event>, BlockingQueue<MicroService>> getEventSubscribers() {
+		return eventSubscribers;
+	}
 	@Override
 	public <T> void subscribeEvent(Class<? extends Event<T>> type, MicroService m) {
 		synchronized (eventSubscribers) { //synchronized (with itself) so 2 threads will not make new lists for same type

@@ -35,6 +35,10 @@ public class LandMark {
         coordinates.set(index, point);
     }
 
+    public void addCoordinates(CloudPoint point){
+        coordinates.add(point);
+    }
+
     public List<CloudPoint> getCoordinates() {
         return coordinates;
     }

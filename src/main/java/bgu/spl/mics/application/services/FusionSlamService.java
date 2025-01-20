@@ -69,13 +69,23 @@ public class FusionSlamService extends MicroService {
         });
 
         subscribeEvent(TrackedObjectsEvent.class, tracked -> {
+//            System.out.println("[DEBUG] Received TrackedObjectsEvent for time: " + tracked.getTrackedObjects().get(0).getTime());
             fusionSlam.getAwaitingProcess().addAll(tracked.getTrackedObjects());
-            fusionSlam.process();
+            // Process only if tracked objects are already waiting
+            if (!fusionSlam.getAwaitingProcess().isEmpty()) {
+                fusionSlam.process();
+            }
+            //fusionSlam.process();
         });
 
         subscribeEvent(PoseEvent.class, pose -> {
-           fusionSlam.addPoses(pose.getCurrPose());
-           fusionSlam.process();
+//            System.out.println("[DEBUG] Handling PoseEvent for time: " + pose.getCurrPose().getTime());
+            fusionSlam.addPoses(pose.getCurrPose());
+            // Process only if tracked objects are already waiting
+            if (!fusionSlam.getAwaitingProcess().isEmpty()) {
+                fusionSlam.process();
+            }
+            //fusionSlam.process();
         });
 
         subscribeBroadcast(TerminatedBroadcast.class, terminated -> { // wait for all sensors to send terminated broadcast??
@@ -95,8 +105,9 @@ public class FusionSlamService extends MicroService {
         });
         subscribeBroadcast(CrashedBroadcast.class, crashed -> {  // wait for all sensors to send terminated broadcast??
             System.err.println("[FusionSlamService] Received CrashedBroadcast. Terminating Fusion SLAM Service.");
+            fusionSlam.setRunning(false);
             fusionSlam.generateErrorOutput();
-            terminateService();
+            this.terminate(); //microService function
         });
     latch.countDown();
     }

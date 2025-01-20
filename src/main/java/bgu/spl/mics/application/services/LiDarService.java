@@ -106,7 +106,7 @@ public class LiDarService extends MicroService {
         });
 
         subscribeBroadcast(CrashedBroadcast.class, crashed -> {
-            System.err.println("[LiDAR Worker " + liDarWorkerTracker.getId() + "] Received CrashedBroadcast. Terminating.");
+            System.err.println("[LiDAR Worker " + liDarWorkerTracker.getId() + "] Received CrashedBroadcast from " + crashed.getSender() + ". Terminating.");
             terminateService();
         });
         latch.countDown();

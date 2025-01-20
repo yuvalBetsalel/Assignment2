@@ -44,6 +44,10 @@ public class Camera {
         return detectedObjectList;
     }
 
+    public void setDetectedObjectList(List<StampedDetectedObjects> detectedObjectList) {
+        this.detectedObjectList = detectedObjectList;
+    }
+
     public String getCamera_key() {
         return camera_key;
     }
