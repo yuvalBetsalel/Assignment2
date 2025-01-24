@@ -28,12 +28,9 @@ public class GurionRockRunner {
      * The main method of the simulation.
      * This method sets up the necessary components, parses configuration files,
      * initializes services, and starts the simulation.
-     *
      * @param args Command-line arguments. The first argument is expected to be the path to the configuration file.
      */
     public static void main(String[] args) {
-        System.out.println("Starting Simulation");
-        //String configFilePath = "C:/Users/97254/Downloads/Skeleton/example_input_2/configuration_file.json";
         String configFilePath = args[0];
         Config config = ConfigParser.parseConfig(configFilePath);
         String filePathLocation = Paths.get(configFilePath).getParent().toFile().getAbsolutePath() + File.separator;
@@ -47,13 +44,11 @@ public class GurionRockRunner {
         // Create a CountDownLatch to synchronize initialization
         CountDownLatch latch = new CountDownLatch(totalServices);
 
-        //make new fusionSlam service:
+        // Make new fusionSlam service:
         FusionSlamService newFusionSlamService = new FusionSlamService(FusionSlam.getInstance(), latch);
         new Thread(newFusionSlamService).start();
-        //MessageBusImpl.getInstance().setInitializeCounter(numOfCamera + numOfLidar + 3);
-        System.out.println("new fusion service was created");
 
-        //make new camera services:
+        // Make new camera services:
         String cameraFilePath = filePathLocation + config.getCameras().getCamera_datas_path().substring(1);
         for (Camera camera : config.getCameras().getCamerasConfigurations()){
             Camera newCamera = new Camera(camera.getId(), camera.getFrequency());
@@ -61,31 +56,22 @@ public class GurionRockRunner {
             newCameraService.setFilePath(cameraFilePath);
             addCounter();
             new Thread(newCameraService).start();
-            System.out.println("new camera service was created");
         }
-        //make new lidar services:
+        // Make new lidar services:
         String lidarFilePath = filePathLocation + config.getLiDarWorkers().getFilePath().substring(1);
         for (LiDarWorkerTracker lidar : config.getLiDarWorkers().getLidarConfigurations()){
             LiDarWorkerTracker newLidar = new LiDarWorkerTracker(lidar.getId(), lidar.getFrequency(), lidarFilePath);
             LiDarService newLidarService = new LiDarService(newLidar, latch);
-            //newLidarService.setFilePath(lidarFilePath);
             addCounter();
             new Thread(newLidarService).start();
 
-            System.out.println("new lidar service was created");
         }
-        //make new pose service:
+        // Make new pose service:
         String poseFilePath = filePathLocation + config.getPoseJsonFile().substring(1);
         PoseService newPoseService = new PoseService(new GPSIMU(poseFilePath), latch);
         new Thread(newPoseService).start();
-        //addCounter();
-        System.out.println("new pose service was created");
-        //make new time service:
+        // Make new time service:
         TimeService newTimeService = new TimeService(config.getTickTime(), config.getDuration(), latch);
         new Thread(newTimeService).start();
-        //addCounter();
-        System.out.println("new time service was created");
-
-
     }
 }

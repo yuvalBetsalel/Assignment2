@@ -16,9 +16,9 @@ public class    TimeService extends MicroService {
     private int tickTime;
     private int duration;
     private int counter;
+
     /**
      * Constructor for TimeService.
-     *
      * @param TickTime  The duration of each tick in milliseconds.
      * @param Duration  The total number of ticks before the service terminates.
      */
@@ -36,28 +36,17 @@ public class    TimeService extends MicroService {
      */
     @Override
     protected void initialize() {
-//        subscribeBroadcast(TerminatedBroadcast.class, terminated -> {
-//            MicroService m = terminated.getSender();
-//            if (m instanceof FusionSlamService) {
-//                terminate();
-//            }
-//        });
-
-        //if (messageBus.getInitializeCounter() == 0) {
             try {
                 latch.await();
-                System.out.println("all services are initialized");
                 while (counter <= duration && FusionSlam.getInstance().isRunning()) {
-                    Thread.sleep(tickTime*100);// Sleep for tickTime to simulate real-time ticking
+                    Thread.sleep(tickTime*100); // Sleep for tickTime to simulate real-time ticking
                     sendBroadcast(new TickBroadcast(counter)); // Broadcast the current tick
-                    System.out.println("sent tick " + counter);
                     counter++;
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
             this.messageBus.sendBroadcast(new TerminatedBroadcast(this));
-            System.out.println("time service is done");
             terminate(); // Signal termination after the duration
 
 

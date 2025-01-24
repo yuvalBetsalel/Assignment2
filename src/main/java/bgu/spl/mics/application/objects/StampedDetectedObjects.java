@@ -29,9 +29,4 @@ public class StampedDetectedObjects {
     public List<DetectedObject> getDetectedObjects() {
         return detectedObjects;
     }
-
-    //    public void addDetectedObject(DetectedObject object){
-//        detectedObjects.add(object);
-//    }
-
 }

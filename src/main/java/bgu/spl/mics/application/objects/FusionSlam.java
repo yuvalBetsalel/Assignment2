@@ -1,14 +1,9 @@
 package bgu.spl.mics.application.objects;
 
-import java.io.BufferedReader;
-import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
@@ -72,7 +67,6 @@ public class FusionSlam {
             throw new IllegalArgumentException("Invalid pose: " + pose);
         }
         poses.add(pose);
-//        System.out.println("[DEBUG] Pose added: " + pose);
     }
     public void addLandMark(LandMark landMark){
         landmarks.add(landMark);
@@ -100,9 +94,6 @@ public class FusionSlam {
      * @param cloudpoints The cloud points of the tracked object providing the new coordinates.
      */
     public void updateLandMarkCoordinates(LandMark landMark, List<CloudPoint> cloudpoints) {
-//        System.out.println("[DEBUG] Updating coordinates for landmark ID: " + landMark.getId());
-//        System.out.println("[DEBUG] Existing coordinates: " + landMark.getCoordinates());
-//        System.out.println("[DEBUG] New cloudpoints: " + cloudpoints);
         // Ensure landMarkCoordinates has enough capacity
         while (landMark.getCoordinates().size() < cloudpoints.size()) {
             landMark.addCoordinates(null); // Add placeholder values
@@ -122,49 +113,27 @@ public class FusionSlam {
                 landMark.setCoordinates(i, newCloudPoint);
             }
         }
-//        System.out.println("[DEBUG] Updated coordinates: " + landMark.getCoordinates());
-
-//        int commonSize = Math.min(landMark.getCoordinates().size(), cloudpoints.size());
-//        for (int i = 0; i < commonSize; i++) { //cloudpoints.size()
-//            Double newX = (landMark.getCoordinates().get(i).getX()
-//                    + cloudpoints.get(i).getX()) / 2;
-//            Double newY = (landMark.getCoordinates().get(i).getY()
-//                    + cloudpoints.get(i).getY()) / 2;
-//
-//            CloudPoint newCloudPoint = new CloudPoint(newX, newY);
-//            landMark.setCoordinates(i, newCloudPoint);
-//        }
-//        if (landMark.getCoordinates().size() < cloudpoints.size()){
-//            for (int i = landMark.getCoordinates().size() ; i < cloudpoints.size(); i++){
-//                landMark.setCoordinates(i, cloudpoints.get(i));
-//            }
-//        }
     }
 
     public Pose getPose(int time){
         for(Pose p: poses){
             if (p.getTime() == time) {
-//                System.out.println("[DEBUG] Pose found for time " + time + ": " + p);
                 return p;
             }
         }
-//        System.err.println("[ERROR] No pose found for time: " + time);
         return null;
     }
 
     /**
      * Creates a new landmark by transforming local coordinates to the global coordinate system.
-     *
      * @param trackedObject The tracked object providing the local coordinates.
      */
     public LandMark createNewLandMark(int time, TrackedObject trackedObject) {
         // Retrieve the robot's pose at the given time from Fusion-SLAM
         Pose pose = getPose(time);
         if (pose == null){
-            System.err.println("Pose not found for time: " + time);
             return null;
         }
-        System.out.println("current pose: " + pose + " tracked object: " + trackedObject);
         Double xRobot = (double) pose.getX();
         Double yRobot = (double) pose.getY();
         Double yawRobot = (double) pose.getYaw();
@@ -186,10 +155,9 @@ public class FusionSlam {
 
     public void generateErrorOutput(){
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
-        String outputFilePath = baseDirectory + "error_output_Y&H.json"; // Define file path
+        String outputFilePath = baseDirectory + "error_output.json"; // Define file path
         try (FileWriter writer = new FileWriter(outputFilePath)) {
             gson.toJson(ErrorOutput.getInstance(), writer);
-            System.out.println("Error Output file generated successfully: " + outputFilePath);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -197,11 +165,9 @@ public class FusionSlam {
 
     public void generateOutputFile(){
         Gson gson = new GsonBuilder().setPrettyPrinting().create();
-        String outputFilePath = baseDirectory + "output_file_Y&H.json"; // Define file path
-        System.out.println("saving to " + outputFilePath);
+        String outputFilePath = baseDirectory + "output_file.json"; // Define file path
         try (FileWriter writer = new FileWriter(outputFilePath)) {
             gson.toJson(statisticalFolder, writer);
-            System.out.println("Output file generated successfully: " + outputFilePath);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -210,26 +176,19 @@ public class FusionSlam {
     public void process(){
         List<TrackedObject> copyList = new ArrayList<>(awaitingProcess);
         for (TrackedObject trackedObject : copyList ){
-//            System.out.println("[DEBUG] Processing tracked object: " + trackedObject.getId() + " at time " + trackedObject.getTime());
             Pose pose = getPose(trackedObject.getTime());
             if (pose == null){
-//                System.err.println("[ERROR] Skipping tracked object " + trackedObject.getId() + ": No pose available");
                 continue;
             }
             awaitingProcess.remove(trackedObject);
             LandMark existingLandMark = findMatchingLandMark(trackedObject);
             if (existingLandMark != null) {
                 // Update the existing landmark with averaged coordinates
-//                System.out.println("[DEBUG] Updating existing landmark for object ID: " + trackedObject.getId());
                 LandMark newLandMark = createNewLandMark(trackedObject.getTime(), trackedObject);
                 updateLandMarkCoordinates(existingLandMark, newLandMark.getCoordinates());
             } else {
-                // Create a new landmark and transform local coordinates to global
-//                System.out.println("[DEBUG] Creating new landmark for object ID: " + trackedObject.getId());
-                //System.out.println("[FusionSlamService] Creating new landmark for tracked object: " + trackedObject.getId());
                 LandMark newLandMark = createNewLandMark(trackedObject.getTime(), trackedObject);
                 addLandMark(newLandMark);
-                //messageBus.complete(tracked, newLandMark);
                 StatisticalFolder.getInstance().addLandmarks();
             }
         }

@@ -21,7 +21,6 @@ import bgu.spl.mics.application.objects.*;
  */
 public class CameraService extends MicroService {
     private final Camera camera;
-    //private Event<? extends Object> DetectObjectsEvent;
     private Map<Integer, List<DetectedObject>> waitingList;
     protected final StatisticalFolder statisticalFolder;
     protected final ErrorOutput errorOutput;
@@ -29,7 +28,6 @@ public class CameraService extends MicroService {
     private CountDownLatch latch;
     /**
      * Constructor for CameraService.
-     *
      * @param camera The Camera object that this service will use to detect objects.
      */
     public CameraService(Camera camera, CountDownLatch latch) {
@@ -50,7 +48,6 @@ public class CameraService extends MicroService {
             camera.setStatus(STATUS.DOWN);
             this.messageBus.sendBroadcast(new TerminatedBroadcast(this));
             this.terminate(); //microService function
-            //this.messageBus.unregister(this);
         }
 
         /**
@@ -61,17 +58,13 @@ public class CameraService extends MicroService {
         @Override
         protected void initialize () {
             camera.loadCameraData(filePath);
-            //System.out.println("[Camera Service] Loaded camera data from file: " + filePath);
 
             subscribeBroadcast(TickBroadcast.class, tick -> {
                 int currTick = tick.getCounter();
-                System.out.println("[Camera " + camera.getCamera_key() + "] Tick: " + currTick);
                 for (StampedDetectedObjects stampedObj : camera.getDetectedObjectList()){
                     if (stampedObj.getTime() == currTick){
                         for (DetectedObject obj : stampedObj.getDetectedObjects()){
                             if (obj.getId().equals("ERROR")) {
-                                System.err.println("[Camera " + camera.getCamera_key() + "] ERROR detected: "
-                                        + obj.getDescription() + " at tick: " + currTick);
                                 camera.setStatus(STATUS.ERROR);
                                 errorOutput.setError(obj.getDescription());
                                 errorOutput.setFaultySensor(camera.getCamera_key());
@@ -80,7 +73,6 @@ public class CameraService extends MicroService {
                                 terminate();
                             }
                         }
-                        System.out.println("[Camera " + camera.getCamera_key() + "] Detected objects at time: " + currTick);
                         waitingList.put(currTick + camera.getFrequency(), stampedObj.getDetectedObjects());
                         break;
                     }
@@ -88,17 +80,13 @@ public class CameraService extends MicroService {
                 if (waitingList.containsKey(currTick)){
                     StampedDetectedObjects stampedDetectedObjects = new StampedDetectedObjects(currTick- camera.getFrequency(),
                             waitingList.get(currTick));
-                    System.out.println("[Camera " + camera.getCamera_key() + "] Sending detected objects of time: "
-                            + stampedDetectedObjects.getTime() + " at tick: " + currTick);
                     statisticalFolder.addDetectedObjects(stampedDetectedObjects.getDetectedObjects().size());
                     if (camera.getStatus().equals(STATUS.UP))
                         errorOutput.addCameraFrame(stampedDetectedObjects, camera.getCamera_key());
                     sendEvent(new DetectObjectsEvent(stampedDetectedObjects));
                 }
                 //check if we already processed all objects
-                int lastIndex = camera.getDetectedObjectList().size()-1;
-                if (camera.getDetectedObjectList().get(lastIndex).getTime() + camera.getFrequency() < currTick){
-                    System.out.println("[Camera " + camera.getCamera_key() + "] All objects processed. Terminating service.");
+                if (camera.getMaxTime() <= currTick){
                     terminateService();
                 }
             });
@@ -106,13 +94,11 @@ public class CameraService extends MicroService {
             subscribeBroadcast(TerminatedBroadcast.class, terminated -> {
                 MicroService m = terminated.getSender();
                 if (m instanceof TimeService) {
-                    System.out.println("[Camera " + camera.getCamera_key() + "] Received TerminatedBroadcast from TimeService. Terminating.");
                     terminateService();
                 }
             });
 
             subscribeBroadcast(CrashedBroadcast.class, crashed -> {
-                System.err.println("[Camera " + camera.getCamera_key() + "] Received CrashedBroadcast. Terminating.");
                 terminateService();
             });
             latch.countDown();

@@ -18,12 +18,11 @@ import bgu.spl.mics.application.objects.STATUS;
  */
 public class PoseService extends MicroService {
     private CountDownLatch latch;
-    private GPSIMU gpsimu; //private?
+    private GPSIMU gpsimu;
     protected final ErrorOutput errorOutput;
 
     /**
      * Constructor for PoseService.
-     *
      * @param gpsimu The GPSIMU object that provides the robot's pose data.
      */
     public PoseService(GPSIMU gpsimu, CountDownLatch latch) {
@@ -48,17 +47,14 @@ public class PoseService extends MicroService {
     @Override
     protected void initialize() {
         gpsimu.loadPoseData();
-        System.out.println("[PoseService] Pose data loaded. Total poses: " + gpsimu.getPoseList().size());
-
+        
 
         subscribeBroadcast(TickBroadcast.class, tick -> {
             int currTick = tick.getCounter();
-            if (currTick >= gpsimu.getPoseList().size())
+            if (currTick > gpsimu.getPoseList().size())
                 terminateService();
             else {
                 Pose currPose = gpsimu.getPoseList().get(currTick - 1);
-                System.out.println("[PoseService] Broadcasting PoseEvent for pose at tick: " + currTick +
-                        " [x=" + currPose.getX() + ", y=" + currPose.getY() + ", yaw=" + currPose.getYaw() + "]");
                 errorOutput.setPoses(gpsimu.getPoseList().subList(0,currTick));
                 sendEvent(new PoseEvent(currPose));
             }

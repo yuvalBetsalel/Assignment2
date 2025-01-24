@@ -24,11 +24,9 @@ public class LiDarService extends MicroService {
     protected final ErrorOutput errorOutput;
     private CountDownLatch latch;
     private int currTick;
-    //private Map<Integer, List<TrackedObject>> waitingList;
 
     /**
      * Constructor for LiDarService.
-     *
      * @param LiDarWorkerTracker A LiDAR Tracker worker object that this service will use to process data.
      */
     public LiDarService(LiDarWorkerTracker LiDarWorkerTracker, CountDownLatch latch) {
@@ -37,13 +35,8 @@ public class LiDarService extends MicroService {
         statisticalFolder = StatisticalFolder.getInstance();
         errorOutput = ErrorOutput.getInstance();
         this.latch = latch;
-        //waitingList = new ConcurrentHashMap<>();
         currTick = 0;
     }
-
-//    public void setFilePath(String filePath){
-//        liDarWorkerTracker.setDataFile(filePath);
-//    }
 
     private void terminateService() {
         liDarWorkerTracker.setStatus(STATUS.DOWN);
@@ -59,7 +52,6 @@ public class LiDarService extends MicroService {
     @Override
     protected void initialize() {
         subscribeEvent(DetectObjectsEvent.class, detected -> {
-            System.out.println("[" + getName() + "]" + " received detected objects of time " + detected.getStampedDetectedObjects().getTime());
             liDarWorkerTracker.checkData(detected.getStampedDetectedObjects());
             //checks for objects to send:
             List<TrackedObject> readyToSendTrackedObjects = liDarWorkerTracker.canSendTrackedObjects(currTick);
@@ -78,21 +70,18 @@ public class LiDarService extends MicroService {
 
         subscribeBroadcast(TickBroadcast.class, tick -> {
             currTick = tick.getCounter();
-            System.out.println("[LiDAR Worker " + liDarWorkerTracker.getId() + "] Tick: " + currTick);
             List<TrackedObject> readyToSendTrackedObjects = liDarWorkerTracker.canSendTrackedObjects(currTick);
             if (readyToSendTrackedObjects == null){
                 sendBroadcast(new CrashedBroadcast(this));
                 terminate();
                 return;
             }
-            //System.out.println("Sending " + readyToSendTrackedObjects.size() + " at tick " + currTick);
             if (!readyToSendTrackedObjects.isEmpty()) {
                 statisticalFolder.addTrackedObjects(readyToSendTrackedObjects.size());
                 errorOutput.addLidarFrame(readyToSendTrackedObjects, "LidarWorkerTracker"+liDarWorkerTracker.getId());
                 sendEvent(new TrackedObjectsEvent(readyToSendTrackedObjects));
             }
             if (liDarWorkerTracker.getLastTrackedObjects().isEmpty()&& liDarWorkerTracker.isFinished()) {
-                System.out.println("[LiDAR Worker " + liDarWorkerTracker.getId() + "] Terminating service after final processing.");
                 terminateService();
             }
         });
@@ -100,13 +89,11 @@ public class LiDarService extends MicroService {
         subscribeBroadcast(TerminatedBroadcast.class, terminated -> {
             MicroService m = terminated.getSender();
             if (m instanceof TimeService) {
-                System.out.println("[LiDAR Worker " + liDarWorkerTracker.getId() + "] Received TerminatedBroadcast from TimeService. Terminating.");
                 terminateService();
             }
         });
 
         subscribeBroadcast(CrashedBroadcast.class, crashed -> {
-            System.err.println("[LiDAR Worker " + liDarWorkerTracker.getId() + "] Received CrashedBroadcast from " + crashed.getSender() + ". Terminating.");
             terminateService();
         });
         latch.countDown();

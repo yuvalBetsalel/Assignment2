@@ -70,14 +70,4 @@ public class StatisticalFolder {
     public void addLandmarks(){
         this.numLandmarks.incrementAndGet();
     }
-
-    //@Override
-//    public String toString() {
-//        return  "systemRuntime:" + systemRuntime +
-//                ", numDetectedObjects:" + numDetectedObjects +
-//                ", numTrackedObjects:" + numTrackedObjects +
-//                ", numLandmarks:" + numLandmarks +
-//                ", landMarks:" + landMarks +
-//                '}';
-//    }
 }

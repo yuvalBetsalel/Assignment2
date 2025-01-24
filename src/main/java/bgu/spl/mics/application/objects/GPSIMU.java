@@ -14,13 +14,11 @@ import java.util.List;
  * Provides information about the robot's position and movement.
  */
 public class GPSIMU {
-    private int currentTick;  //what is this for?
     private STATUS status;
     private List<Pose> poseList;
     private String filePath;
 
     public GPSIMU(String filePath){
-        currentTick = 0;
         status = STATUS.UP;
         poseList = new ArrayList<>();
         this.filePath = filePath;

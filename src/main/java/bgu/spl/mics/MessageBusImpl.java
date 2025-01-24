@@ -1,10 +1,5 @@
 package bgu.spl.mics;
 
-//import org.w3c.dom.Node;
-//import sun.jvm.hotspot.opto.Node_List;
-
-//import java.util.LinkedList;
-//import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;

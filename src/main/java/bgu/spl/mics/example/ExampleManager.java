@@ -52,7 +52,6 @@ public class ExampleManager {
                 }
             }
         } catch (Throwable t) {
-            System.err.println("Unexpected Error!!!!");
             t.printStackTrace();
         } finally {
             System.out.println("Manager Terminating - UNGRACEFULLY!");

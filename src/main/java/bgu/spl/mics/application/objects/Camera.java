@@ -7,7 +7,6 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
@@ -22,16 +21,20 @@ public class Camera {
     private String camera_key;
     private STATUS status;
     private List<StampedDetectedObjects> detectedObjectList ;
+    private int maxTime;
 
-    public Camera(int id, int frequency) {  //where do we get the status?
+    public Camera(int id, int frequency) {
         this.id = id;
         this.frequency = frequency;
         camera_key = "camera"+id;
         status = STATUS.UP;
         detectedObjectList = new ArrayList<>();
+        maxTime = 0;
     }
 
-
+    public int getMaxTime() {
+        return maxTime;
+    }
     public int getId(){
         return id;
     }
@@ -42,10 +45,6 @@ public class Camera {
 
     public List<StampedDetectedObjects> getDetectedObjectList() {
         return detectedObjectList;
-    }
-
-    public void setDetectedObjectList(List<StampedDetectedObjects> detectedObjectList) {
-        this.detectedObjectList = detectedObjectList;
     }
 
     public String getCamera_key() {
@@ -74,6 +73,9 @@ public class Camera {
                 if (cameraId.equals("camera"+id)){
                     List<StampedDetectedObjects> stampedObjects = entry.getValue();
                     for (StampedDetectedObjects stampedObj : stampedObjects) {
+                        if(maxTime < stampedObj.getTime() + frequency){
+                            maxTime = stampedObj.getTime() + frequency;
+                        }
                         detectedObjectList.add(stampedObj);
                     }
                 }

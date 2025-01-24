@@ -4,7 +4,6 @@ import bgu.spl.mics.Broadcast;
 
 public class TickBroadcast implements Broadcast {
 
-    //private String senderId;
     private int counter;
 
     public TickBroadcast(int counter) {

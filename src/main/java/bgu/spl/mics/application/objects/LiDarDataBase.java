@@ -16,10 +16,6 @@ import com.google.gson.reflect.TypeToken;
 public class LiDarDataBase {
 
     private static LiDarDataBase instance = null;
-//    private static class LiDarDataBaseHolder {
-//        private static LiDarDataBase instance = new LiDarDataBase();
-//    }
-    //private static String filePath ;
     private List<StampedCloudPoints> stampedCloudPoints;
     private int trackedPoints;
 
@@ -29,17 +25,10 @@ public class LiDarDataBase {
             trackedPoints = 0;
     }
 
-//    public static void setFilePath(String filePath) {
-//        LiDarDataBase.filePath = filePath;
-//    }
-
     /**
      * Returns the singleton instance of LiDarDataBase.
-     *
      * @return The singleton instance of LiDarDataBase.
      */
-
-
     public static LiDarDataBase getInstance(String filePath) {
         if (instance == null){
             instance = new LiDarDataBase(filePath);
@@ -49,10 +38,6 @@ public class LiDarDataBase {
 
     public List<StampedCloudPoints> getStampedCloudPoints() {
         return stampedCloudPoints;
-    }
-
-    public int getSize(){
-        return stampedCloudPoints.size();
     }
 
     private void loadLidarData(String filePath){

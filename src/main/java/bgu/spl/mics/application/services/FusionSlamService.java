@@ -48,12 +48,9 @@ public class FusionSlamService extends MicroService {
     }
 
     private void terminateService() {
-        //this.messageBus.sendBroadcast(new TerminatedBroadcast(this));
         fusionSlam.setRunning(false);
         StatisticalFolder.getInstance().setSystemRuntime(time);
         StatisticalFolder.getInstance().setLandMarks(fusionSlam.getLandmarks());
-        fusionSlam.generateOutputFile();
-        System.out.println("[FusionSlamService] Output file generated successfully.");
         this.terminate(); //microService function
     }
 
@@ -69,47 +66,52 @@ public class FusionSlamService extends MicroService {
         });
 
         subscribeEvent(TrackedObjectsEvent.class, tracked -> {
-//            System.out.println("[DEBUG] Received TrackedObjectsEvent for time: " + tracked.getTrackedObjects().get(0).getTime());
             fusionSlam.getAwaitingProcess().addAll(tracked.getTrackedObjects());
             // Process only if tracked objects are already waiting
             if (!fusionSlam.getAwaitingProcess().isEmpty()) {
                 fusionSlam.process();
             }
-            //fusionSlam.process();
+            if (serviceCounter <= 0 && fusionSlam.getAwaitingProcess().isEmpty()) {
+                messageBus.sendBroadcast(new TerminatedBroadcast(this));
+                terminateService();
+                fusionSlam.generateOutputFile();
+            }
         });
 
         subscribeEvent(PoseEvent.class, pose -> {
-//            System.out.println("[DEBUG] Handling PoseEvent for time: " + pose.getCurrPose().getTime());
             fusionSlam.addPoses(pose.getCurrPose());
             // Process only if tracked objects are already waiting
             if (!fusionSlam.getAwaitingProcess().isEmpty()) {
                 fusionSlam.process();
             }
-            //fusionSlam.process();
+            if (serviceCounter <= 0 && fusionSlam.getAwaitingProcess().isEmpty()) {
+                messageBus.sendBroadcast(new TerminatedBroadcast(this));
+                terminateService();
+                fusionSlam.generateOutputFile();
+            }
         });
 
-        subscribeBroadcast(TerminatedBroadcast.class, terminated -> { // wait for all sensors to send terminated broadcast??
+        subscribeBroadcast(TerminatedBroadcast.class, terminated -> {
             MicroService m = terminated.getSender();
             if((m instanceof CameraService) || (m instanceof LiDarService )) {
                 removeFromCounter();
-                if (serviceCounter <= 0) {
-                    System.out.println("[FusionSlamService] All services finished. Terminating Fusion SLAM Service.");
+                if (serviceCounter <= 0 && fusionSlam.getAwaitingProcess().isEmpty()) {
                     messageBus.sendBroadcast(new TerminatedBroadcast(this));
                     terminateService();
+                    fusionSlam.generateOutputFile();
                 }
             } else if (m instanceof TimeService) {
-                System.out.println("[FusionSlamService] Received TerminatedBroadcast from TimeService. Terminating Fusion SLAM Service.");
                 terminateService();
+                fusionSlam.generateOutputFile();
             }
 
         });
-        subscribeBroadcast(CrashedBroadcast.class, crashed -> {  // wait for all sensors to send terminated broadcast??
-            System.err.println("[FusionSlamService] Received CrashedBroadcast. Terminating Fusion SLAM Service.");
+        subscribeBroadcast(CrashedBroadcast.class, crashed -> {
             fusionSlam.setRunning(false);
+            terminateService();
             fusionSlam.generateErrorOutput();
-            this.terminate(); //microService function
         });
-    latch.countDown();
+        latch.countDown();
     }
 
 

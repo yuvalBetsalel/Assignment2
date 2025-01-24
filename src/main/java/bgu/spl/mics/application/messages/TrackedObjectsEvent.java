@@ -10,7 +10,6 @@ public class TrackedObjectsEvent implements Event<Boolean> {
 
     public TrackedObjectsEvent(List<TrackedObject> list){
         trackedObjects = list;
-        //System.out.println("new TrackedObjectsEvent was created");
     }
 
     public List<TrackedObject> getTrackedObjects() {
